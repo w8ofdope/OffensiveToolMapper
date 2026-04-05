@@ -1,0 +1,103 @@
+---
+title: "Введение в OffensiveToolMapper"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Введение в OffensiveToolMapper}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+# Что делает проект
+
+`OffensiveToolMapper` собирает offensive security инструменты из открытых источников,
+нормализует их, проводит LLM-оценку, строит MITRE ATT&CK mapping и публикует
+результаты в трёх прикладных слоях:
+
+- Shiny dashboard для аналитика;
+- modern React UI для продуктового представления данных;
+- MCP server для AI-агентов и внешних ассистентов.
+
+# Основной поток данных
+
+Проект работает как последовательный pipeline:
+
+1. ETL из GitHub, PacketStorm и RSS;
+2. нормализация и фильтрация нерелевантных кандидатов;
+3. unified one-call LLM assessment;
+4. retrieval-first MITRE refinement;
+5. visualization/export слой для UI и MCP.
+
+# Ключевые артефакты
+
+После полного прогона в каталоге `inst/extdata/` обычно появляются:
+
+- `normalized_tools.rds`;
+- `tool_assessment_results.rds`;
+- `relevant_tools.rds`;
+- `tool_mitre_mappings.rds`;
+- `mitre_refinement_candidates.rds`;
+- `visualization_tools.rds`;
+- `visualization_tool_matrix.rds`;
+- `offensive_tool_mapper.duckdb`.
+
+Для modern UI дополнительно экспортируются JSON-артефакты в `webapp/public/data/`.
+
+# Минимальный локальный запуск
+
+Полный прогон пайплайна:
+
+```{r eval = FALSE}
+source("data-raw/run_full_pipeline.R")
+```
+
+Только unified assessment:
+
+```{r eval = FALSE}
+source("data-raw/run_unified_tool_assessment.R")
+```
+
+Только тесты:
+
+```{r eval = FALSE}
+source("data-raw/run_tests.R")
+```
+
+# Что важно про LLM runtime
+
+Основной runtime-path использует DeepSeek по умолчанию. OpenAI остаётся fallback-вариантом.
+Настройка делается через переменные окружения:
+
+- `DEEPSEEK_API_KEY`;
+- `OPENAI_API_KEY`;
+- `LLM_PROVIDER`;
+- `LLM_MODEL`;
+- `LLM_BASE_URL`;
+- `LLM_MAX_RECORDS`.
+
+# Интерфейсы потребления
+
+## Shiny
+
+Shiny dashboard показывает:
+
+- overview с топовыми инструментами;
+- MITRE heatmap и распределение по tactic;
+- таблицу инструментов с фильтрами;
+- operational-вкладку со статусом pipeline и артефактов.
+
+## Modern UI
+
+React/Vite слой использует JSON-экспорт и даёт отдельные режимы:
+
+- overview;
+- analytics;
+- explorer.
+
+## MCP
+
+MCP server даёт инструменты для поиска по каталогу, получения MITRE-связей и базовой
+классификации новых кандидатов.

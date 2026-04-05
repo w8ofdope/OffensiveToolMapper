@@ -1,0 +1,49 @@
+services:
+  shiny-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      OFFENSIVETOOLMAPPER_DATA_DIR: /app/inst/extdata
+      MODERN_UI_URL: http://localhost:5173
+    working_dir: /app
+    command: >
+      sh -lc "Rscript data-raw/export_webapp_data.R &&
+      Rscript -e \"shiny::runApp('inst/shiny', launch.browser = FALSE, host = '0.0.0.0', port = 8788)\""
+    volumes:
+      - .:/app
+    ports:
+      - "8788:8788"
+
+  modern-ui:
+    image: node:22-alpine
+    working_dir: /app/webapp
+    command: >
+      sh -lc "npm install && npx vite --host 0.0.0.0 --port 5173"
+    volumes:
+      - .:/app
+    ports:
+      - "5173:5173"
+    depends_on:
+      - shiny-app
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      OFFENSIVETOOLMAPPER_DATA_DIR: /app/inst/extdata
+      OTM_MCP_TRANSPORT: http
+      OTM_MCP_PORT: 3000
+    working_dir: /app
+    command: sh -lc "Rscript inst/mcp/run_server.R"
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - shiny-app

@@ -1,0 +1,99 @@
+---
+title: "Пайплайн данных OffensiveToolMapper"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Пайплайн данных OffensiveToolMapper}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+# Общая схема
+
+Pipeline организован так, чтобы каждая стадия могла запускаться отдельно и сохранять
+результат в `inst/extdata/`.
+
+Основные стадии:
+
+1. raw ETL;
+2. normalize;
+3. assessment;
+4. refine_mitre;
+5. visualize;
+6. export_webapp.
+
+# Raw ETL
+
+Источник данных состоит из трёх каналов:
+
+- GitHub repositories;
+- PacketStorm feeds;
+- RSS/Atom feeds.
+
+Каждый raw-layer сохраняется отдельно и может быть переиспользован без повторного сбора.
+
+# Normalize
+
+На стадии нормализации данные приводятся к единой схеме и проходят pre-LLM filtering.
+
+На этом этапе отсекаются:
+
+- documentation-like repositories;
+- markdown-only helper repos без executable artifacts;
+- cert-prep/manual/notes/cheatsheet content;
+- другие кандидаты, не похожие на реальный offensive tool.
+
+# Unified assessment
+
+Primary-path для MVP теперь строится через один LLM-вызов, который сразу возвращает:
+
+- релевантность;
+- тип сущности;
+- русские описания для UI;
+- MITRE mappings.
+
+Результаты пишутся как в RDS-артефакты, так и в DuckDB supplemental storage.
+
+# MITRE refinement
+
+Поверх основного MITRE mapping работает retrieval-first refinement слой.
+
+Он не заменяет основной assessment, а строит candidate suggestions для дальнейшей
+ручной проверки или следующего этапа валидации.
+
+# Visualization
+
+Visualization layer строит два основных датасета:
+
+- `visualization_tools.rds` для UI карточек и explorer-представления;
+- `visualization_tool_matrix.rds` для MITRE heatmap, tactic/technique filters и аналитики.
+
+# Web export
+
+Для modern UI формируются JSON-файлы:
+
+- `tools.json`;
+- `matrix.json`;
+- `refinement.json`;
+- `summary.json`.
+
+# Resume-path
+
+Оркестратор поддерживает частичный рестарт с нужной стадии через `run_pipeline_from()`.
+Это позволяет:
+
+- не повторять raw ETL без необходимости;
+- быстро перепроверять только assessment/refinement/export;
+- сохранять stage status в `pipeline_status.rds` и `pipeline_status.json`.
+
+# Проверка состояния
+
+Минимальный operational checklist после крупного изменения:
+
+1. прогнать `data-raw/run_tests.R`;
+2. при необходимости прогнать `data-raw/run_full_pipeline.R`;
+3. проверить `inst/extdata/pipeline_status.json`;
+4. убедиться, что `webapp/public/data/` обновлён.

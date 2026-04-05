@@ -1,0 +1,6 @@
+.git
+.gitignore
+.Rproj.user
+.vscode
+webapp/node_modules
+webapp/dist
