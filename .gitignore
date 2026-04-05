@@ -16,5 +16,6 @@ webapp/node_modules/
 webapp/dist/
 webapp/public/data/
 inst/extdata/
+inst/shiny/app_cache/
 plan.md
 tasks.md
