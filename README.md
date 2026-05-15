@@ -185,6 +185,69 @@ docker compose up --build
 docker compose down
 ```
 
+## Запуск пайплайна из интерфейса
+
+В Shiny-приложении (вкладка **Пайплайн**) есть кнопка **«Запустить пайплайн»**.
+
+По нажатию открывается диалог, где можно настроить:
+
+- провайдер нейросети и модель;
+- лимит записей LLM (0 = без лимита);
+- режим сбора (инкрементальный / снапшот);
+- количество запусков подряд (batch).
+
+После подтверждения пайплайн запускается в фоновом режиме, а таблицы на странице обновляются автоматически.
+
+## Источники данных
+
+Пайплайн собирает данные из трёх источников.
+
+### GitHub (основной)
+
+Поиск репозиториев по ключевым словам, языку и количеству звёзд. Управляется через `.env`:
+
+```env
+OTM_GITHUB_MIN_STARS=10
+OTM_GITHUB_MAX_RESULTS=100
+OTM_GITHUB_MAX_SEARCH_REQUESTS=60
+```
+
+### RSS-ленты
+
+По умолчанию подключены три открытых ленты безопасности:
+
+| Лента | URL |
+| --- | --- |
+| Exploit-DB | `https://www.exploit-db.com/rss.xml` |
+| The Hacker News | `https://feeds.feedburner.com/TheHackersNews` |
+| BleepingComputer | `https://www.bleepingcomputer.com/feed/` |
+
+Чтобы задать другие ленты, укажи их через точку с запятой в `.env`:
+
+```env
+OTM_RSS_FEEDS=https://www.exploit-db.com/rss.xml;https://example.com/feed.xml
+```
+
+Чтобы отключить RSS: `OTM_RSS_FEEDS=disabled`
+
+### PacketStorm
+
+Доступен в двух режимах:
+
+**Ручные URL** (без API-ключа):
+
+```env
+PACKETSTORM_URLS=https://packetstormsecurity.com/files/180000/tool-name.tgz;https://...
+```
+
+**API-доступ** (нужен ключ):
+
+```env
+PACKETSTORM_API_SECRET=ваш-ключ
+```
+
+Если оба варианта пустые — PacketStorm отключён.
+
 ## Сбор данных
 
 Для короткой проверки можно временно указать в `.env`:
@@ -194,7 +257,7 @@ LLM_MAX_RECORDS=20
 OTM_GITHUB_MAX_SEARCH_REQUESTS=10
 ```
 
-Запуск пайплайна внутри Docker:
+Запуск пайплайна через CLI внутри Docker:
 
 ```powershell
 docker compose run --rm shiny-app Rscript data-raw/run_full_pipeline.R

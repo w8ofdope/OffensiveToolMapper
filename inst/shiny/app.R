@@ -1868,7 +1868,11 @@ app_ui <- bslib::page_navbar(
             "Пайплайн и мониторинг",
             "Операционная панель: статусы обработки инструментов, текущая конфигурация нейросети, содержимое базы данных и команды для ручного перезапуска нужного этапа."
           ),
-          shiny::actionButton("pipeline_refresh", "Обновить", class = "pipeline-refresh-button")
+          tags$div(
+            class = "pipeline-toolbar-actions",
+            shiny::actionButton("pipeline_run_btn", "Запустить пайплайн", class = "pipeline-run-button"),
+            shiny::actionButton("pipeline_refresh", "Обновить", class = "pipeline-refresh-button")
+          )
         ),
         shiny::uiOutput("pipeline_metric_grid"),
         tags$div(
@@ -3476,6 +3480,136 @@ app_server <- function(input, output, session) {
       class = "stripe hover cell-border",
       options = list(pageLength = 10, scrollX = TRUE, dom = "tip", autoWidth = FALSE)
     )
+  })
+
+  shiny::observeEvent(input$pipeline_run_btn, {
+    shiny::showModal(shiny::modalDialog(
+      title = "Запустить пайплайн",
+      shiny::selectInput(
+        "modal_provider",
+        "Провайдер нейросети",
+        choices = c("openai", "anthropic", "deepseek", "xai", "groq", "mistral", "ollama"),
+        selected = Sys.getenv("LLM_PROVIDER", unset = "openai")
+      ),
+      shiny::textInput(
+        "modal_model",
+        "Модель (пусто = по умолчанию)",
+        value = Sys.getenv("LLM_MODEL", unset = ""),
+        placeholder = "Оставьте пустым для модели по умолчанию"
+      ),
+      shiny::numericInput(
+        "modal_max_records",
+        "Лимит записей LLM (0 = без лимита)",
+        value = as.integer(Sys.getenv("LLM_MAX_RECORDS", unset = "0")),
+        min = 0L,
+        step = 10L
+      ),
+      shiny::radioButtons(
+        "modal_collect_mode",
+        "Режим сбора данных",
+        choices = c(
+          "Инкрементальный (накапливать)" = "incremental",
+          "Снапшот (заменить текущие)" = "snapshot"
+        ),
+        selected = Sys.getenv("OTM_COLLECT_MODE", unset = "incremental")
+      ),
+      shiny::numericInput(
+        "modal_batch_count",
+        "Количество запусков подряд",
+        value = 1L,
+        min = 1L,
+        max = 20L,
+        step = 1L
+      ),
+      footer = shiny::tagList(
+        shiny::modalButton("Отмена"),
+        shiny::actionButton("modal_pipeline_confirm", "Запустить", class = "btn btn-primary")
+      ),
+      easyClose = TRUE,
+      size = "m"
+    ))
+  })
+
+  shiny::observeEvent(input$modal_pipeline_confirm, {
+    provider     <- input$modal_provider %||% Sys.getenv("LLM_PROVIDER", unset = "openai")
+    model        <- trimws(input$modal_model %||% "")
+    max_records  <- as.integer(input$modal_max_records %||% 0L)
+    collect_mode <- input$modal_collect_mode %||% "incremental"
+    batch_count  <- max(1L, as.integer(input$modal_batch_count %||% 1L))
+
+    shiny::removeModal()
+
+    rscript_path <- Sys.which("Rscript")
+    if (!nzchar(rscript_path)) rscript_path <- "Rscript"
+
+    log_path    <- gsub("\\\\", "/", file.path(extdata_dir, "pipeline_shiny.log"))
+    root_norm   <- gsub("\\\\", "/", project_root)
+    extdata_norm <- gsub("\\\\", "/", extdata_dir)
+    mitre_path  <- gsub("\\\\", "/", file.path(project_root, "data", "mitre_attack.rda"))
+
+    wrapper_lines <- c(
+      sprintf('project_root <- "%s"', root_norm),
+      sprintf('extdata_dir  <- "%s"', extdata_norm),
+      'setwd(project_root)',
+      sprintf('log_con <- file("%s", open = "wt")', log_path),
+      'sink(log_con, append = FALSE)',
+      'sink(log_con, append = FALSE, type = "message")',
+      'on.exit({ try(sink(type = "message")); try(sink()) })',
+      sprintf('Sys.setenv(LLM_PROVIDER = "%s")', provider),
+      sprintf('Sys.setenv(OTM_COLLECT_MODE = "%s")', collect_mode),
+      if (nzchar(model))       sprintf('Sys.setenv(LLM_MODEL = "%s")', model),
+      if (max_records > 0L)    sprintf('Sys.setenv(LLM_MAX_RECORDS = "%s")', max_records),
+      'for (f in c("utils_core.R","text_processing.R","etl_github.R","etl_packetstorm.R",',
+      '            "etl_rss.R","normalize.R","llm_provider.R","llm_contracts.R",',
+      '            "llm_validation.R","storage_duckdb.R","llm_assessment.R",',
+      '            "visualization_data.R","rag_refinement.R","pipeline.R")) {',
+      '  source(file.path(project_root, "R", f))',
+      '}',
+      sprintf('runtime_cfg <- get_llm_runtime_config("%s")', provider),
+      sprintf('for (i in seq_len(%sL)) {', batch_count),
+      '  tryCatch({',
+      sprintf('    run_full_pipeline(data_dir = extdata_dir, provider = "%s",', provider),
+      '      model = runtime_cfg$model[[1]], base_url = runtime_cfg$base_url[[1]],',
+      '      api_key = get_llm_api_key(runtime_cfg$provider[[1]]),',
+      '      max_records = get_default_llm_max_records(),',
+      sprintf('      collect_mode = "%s",', collect_mode),
+      '      run_mitre_refinement = TRUE,',
+      sprintf('      mitre_attack_path = "%s")', mitre_path),
+      '    message(sprintf("Run %%s completed.", i))',
+      '  }, error = function(e) message(sprintf("Run %%s error: %%s", i, conditionMessage(e))))',
+      '}'
+    )
+    wrapper_lines <- wrapper_lines[!sapply(wrapper_lines, is.null)]
+
+    wrapper_path <- file.path(extdata_dir, "pipeline_shiny_wrapper.R")
+    tryCatch(
+      writeLines(wrapper_lines, wrapper_path),
+      error = function(e) {
+        shiny::showNotification(paste("Ошибка подготовки скрипта:", conditionMessage(e)), type = "error", duration = 10)
+        return(NULL)
+      }
+    )
+
+    launch_result <- tryCatch(
+      system2(command = rscript_path, args = shQuote(gsub("\\\\", "/", wrapper_path)), wait = FALSE),
+      error = function(e) e
+    )
+
+    if (inherits(launch_result, "error")) {
+      shiny::showNotification(paste("Ошибка запуска:", conditionMessage(launch_result)), type = "error", duration = 10)
+    } else {
+      shiny::showNotification(
+        shiny::tagList(
+          tags$strong("Пайплайн запущен в фоновом режиме."),
+          tags$br(),
+          sprintf("Провайдер: %s | Режим: %s | Запусков: %s", provider, collect_mode, batch_count),
+          tags$br(),
+          "Таблицы обновятся автоматически при завершении."
+        ),
+        type = "message",
+        duration = 10
+      )
+    }
   })
 }
 

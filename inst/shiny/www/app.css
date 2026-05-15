@@ -417,8 +417,16 @@ body::before {
   color: #2d3748;
 }
 
+.pipeline-toolbar-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
 .pipeline-refresh-button {
-  min-width: 170px;
+  min-width: 140px;
   min-height: 46px;
   border-radius: 999px;
   border: none;
@@ -433,6 +441,24 @@ body::before {
 .pipeline-refresh-button:focus {
   color: #fff;
   background: linear-gradient(135deg, #ff8b4f, #ffad7b);
+}
+
+.pipeline-run-button {
+  min-width: 180px;
+  min-height: 46px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #40b9b4, #29d6c8);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 16px 30px rgba(64, 185, 180, 0.22);
+}
+
+.pipeline-run-button:hover,
+.pipeline-run-button:focus {
+  color: #fff;
+  background: linear-gradient(135deg, #34a8a3, #22c2b5);
 }
 
 .pipeline-metric-grid {

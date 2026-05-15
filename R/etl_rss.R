@@ -2,7 +2,18 @@
 #'
 #' @return Named character vector of default RSS feed URLs.
 get_default_feeds <- function() {
-  character(0)
+  env_feeds <- get_runtime_env_value("OTM_RSS_FEEDS", unset = "")
+
+  if (nzchar(env_feeds)) {
+    values <- trimws(unlist(strsplit(env_feeds, "[\r\n;]+", perl = TRUE), use.names = FALSE))
+    return(values[nzchar(values)])
+  }
+
+  c(
+    exploit_db       = "https://www.exploit-db.com/rss.xml",
+    hackernews_sec   = "https://feeds.feedburner.com/TheHackersNews",
+    bleepingcomputer = "https://www.bleepingcomputer.com/feed/"
+  )
 }
 
 .rss_empty_results <- function() {
