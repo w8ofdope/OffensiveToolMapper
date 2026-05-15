@@ -13,6 +13,9 @@
   [string]$LlmBaseUrl = "",
   [string]$LlmMaxRecords = "",
   [string]$GithubMaxSearchRequests = "",
+  [string]$RssFeeds = "",
+  [string]$PacketStormApiSecret = "",
+  [string]$PacketStormUrls = "",
   [string]$OutputPath = "",
   [switch]$Force,
   [switch]$NonInteractive
@@ -154,12 +157,15 @@ if (-not $DeepSeekApiKey)  { $DeepSeekApiKey  = Get-EnvValue "DEEPSEEK_API_KEY" 
 if (-not $XaiApiKey)       { $XaiApiKey       = Get-EnvValue "XAI_API_KEY"       }
 if (-not $GroqApiKey)      { $GroqApiKey      = Get-EnvValue "GROQ_API_KEY"      }
 if (-not $MistralApiKey)   { $MistralApiKey   = Get-EnvValue "MISTRAL_API_KEY"   }
-if (-not $GithubPat)       { $GithubPat       = Get-EnvValue "GITHUB_PAT"        }
-if (-not $OpenAiOrgId)     { $OpenAiOrgId     = Get-EnvValue "OPENAI_ORG_ID"     }
-if (-not $OpenAiProjectId) { $OpenAiProjectId = Get-EnvValue "OPENAI_PROJECT_ID" }
-if (-not $LlmBaseUrl)      { $LlmBaseUrl      = Get-EnvValue "LLM_BASE_URL"      }
-if (-not $LlmMaxRecords)   { $LlmMaxRecords   = Get-EnvValue "LLM_MAX_RECORDS"   }
+if (-not $GithubPat)            { $GithubPat            = Get-EnvValue "GITHUB_PAT"                }
+if (-not $OpenAiOrgId)          { $OpenAiOrgId          = Get-EnvValue "OPENAI_ORG_ID"            }
+if (-not $OpenAiProjectId)      { $OpenAiProjectId      = Get-EnvValue "OPENAI_PROJECT_ID"        }
+if (-not $LlmBaseUrl)           { $LlmBaseUrl           = Get-EnvValue "LLM_BASE_URL"             }
+if (-not $LlmMaxRecords)        { $LlmMaxRecords        = Get-EnvValue "LLM_MAX_RECORDS"          }
 if (-not $GithubMaxSearchRequests) { $GithubMaxSearchRequests = Get-EnvValue "OTM_GITHUB_MAX_SEARCH_REQUESTS" }
+if (-not $RssFeeds)             { $RssFeeds             = Get-EnvValue "OTM_RSS_FEEDS"            }
+if (-not $PacketStormApiSecret) { $PacketStormApiSecret = Get-EnvValue "PACKETSTORM_API_SECRET"   }
+if (-not $PacketStormUrls)      { $PacketStormUrls      = Get-EnvValue "PACKETSTORM_URLS"         }
 
 if (-not $NonInteractive) {
   Write-SetupStep "3. API keys" "Enter the key for your selected provider. Other keys are optional."
@@ -195,6 +201,16 @@ if (-not $NonInteractive) {
   $LlmMaxRecords = Read-PlainValue "LLM_MAX_RECORDS (optional, example: 20)" $LlmMaxRecords
   $githubRequestDefault = if ($GithubMaxSearchRequests) { $GithubMaxSearchRequests } else { "60" }
   $GithubMaxSearchRequests = Read-PlainValue "OTM_GITHUB_MAX_SEARCH_REQUESTS" $githubRequestDefault
+
+  Write-SetupStep "7. Additional data sources (optional)" "RSS and PacketStorm run automatically if configured."
+  Write-Host "  RSS feeds: leave empty to use defaults (Exploit-DB, TheHackersNews, BleepingComputer)."
+  Write-Host "             Set to 'disabled' to turn off. Or enter URLs separated by semicolons."
+  $RssFeeds = Read-PlainValue "OTM_RSS_FEEDS (optional)" $RssFeeds
+  Write-Host ""
+  Write-Host "  PacketStorm: provide an API secret, OR paste page URLs separated by semicolons."
+  Write-Host "               Leave both empty to skip PacketStorm collection."
+  $PacketStormApiSecret = Read-SecretValue "PACKETSTORM_API_SECRET (optional)" $PacketStormApiSecret
+  $PacketStormUrls      = Read-PlainValue  "PACKETSTORM_URLS (optional, semicolon-separated)" $PacketStormUrls
 }
 
 if ($Provider -ne "ollama") {
@@ -245,6 +261,11 @@ Add-EnvLine $lines "OTM_COLLECT_MODE"               "incremental"
 Add-EnvLine $lines "OTM_GITHUB_MIN_STARS"           "10"
 Add-EnvLine $lines "OTM_GITHUB_MAX_RESULTS"         "100"
 Add-EnvLine $lines "OTM_GITHUB_MAX_SEARCH_REQUESTS" $GithubMaxSearchRequests
+$lines.Add("")
+$lines.Add("# Additional data sources")
+Add-EnvLine $lines "OTM_RSS_FEEDS"           $RssFeeds
+Add-EnvLine $lines "PACKETSTORM_API_SECRET"  $PacketStormApiSecret
+Add-EnvLine $lines "PACKETSTORM_URLS"        $PacketStormUrls
 $lines.Add("")
 $lines.Add("# Shiny/MCP")
 Add-EnvLine $lines "OTM_MCP_TRANSPORT"            "http"
