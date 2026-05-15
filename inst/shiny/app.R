@@ -6,12 +6,20 @@ resolve_project_root <- function() {
   ))
 
   for (candidate in candidates) {
-    if (dir.exists(file.path(candidate, "inst", "extdata"))) {
+    if (
+      file.exists(file.path(candidate, "DESCRIPTION")) &&
+        dir.exists(file.path(candidate, "inst", "shiny"))
+    ) {
+      extdata_path <- file.path(candidate, "inst", "extdata")
+      if (!dir.exists(extdata_path)) {
+        dir.create(extdata_path, recursive = TRUE, showWarnings = FALSE)
+      }
+
       return(normalizePath(candidate, winslash = "/", mustWork = TRUE))
     }
   }
 
-  stop("Project root with inst/extdata was not found.", call. = FALSE)
+  stop("Project root with DESCRIPTION and inst/shiny was not found.", call. = FALSE)
 }
 
 if (getRversion() >= "2.15.1") {
