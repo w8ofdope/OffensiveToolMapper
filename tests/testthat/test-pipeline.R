@@ -41,9 +41,9 @@ test_that("run_pipeline_from can normalize from supplied raw inputs and persist 
   expect_true(file.exists(file.path(data_dir, "normalized_tools.rds")))
   expect_true(file.exists(file.path(data_dir, "pipeline_status.rds")))
   expect_equal(nrow(result$normalized_data), 1)
-  expect_equal(nrow(result$pipeline_status), 1)
-  expect_equal(result$pipeline_status$stage[[1]], "normalize")
-  expect_equal(result$pipeline_status$status[[1]], "success")
+  expect_equal(nrow(result$pipeline_status), 2)
+  expect_equal(result$pipeline_status$stage, c("normalize", "sanity_checks"))
+  expect_true(all(result$pipeline_status$status == "success"))
 })
 
 test_that("run_pipeline_from can resume at visualize using supplied assessment artifacts", {

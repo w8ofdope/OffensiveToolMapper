@@ -83,6 +83,63 @@
   paste(as.character(unlist(value, use.names = FALSE)), collapse = ", ")
 }
 
+.webapp_empty_tools <- function() {
+  tibble::tibble(
+    record_id = character(),
+    assessed_name = character(),
+    source = character(),
+    source_type = character(),
+    url = character(),
+    date_found = character(),
+    entity_type = character(),
+    category_ru = character(),
+    short_description_ru = character(),
+    long_description_ru = character(),
+    summary_ru = character(),
+    purpose_ru = character(),
+    capabilities_ru = list(),
+    reason_ru = character(),
+    pre_llm_score = numeric(),
+    pre_llm_priority = character(),
+    confidence_score = numeric(),
+    detail_score = numeric(),
+    mitre_score = numeric(),
+    entity_priority_score = numeric(),
+    visualization_score = numeric(),
+    overall_confidence = numeric(),
+    llm_provider = character(),
+    llm_model = character(),
+    mitre_tactics = list(),
+    mitre_technique_ids = list(),
+    mitre_technique_names = list(),
+    mitre_tactic_count = integer(),
+    mitre_technique_count = integer(),
+    filter_tags = list(),
+    visualization_rank = integer(),
+    mitre_matrix = list(),
+    first_ui_added_at = character(),
+    last_ui_seen_at = character()
+  )
+}
+
+.webapp_empty_matrix <- function() {
+  tibble::tibble(
+    record_id = character(),
+    assessed_name = character(),
+    source = character(),
+    url = character(),
+    entity_type = character(),
+    category_ru = character(),
+    technique_id = character(),
+    technique_name = character(),
+    tactic = character(),
+    confidence = numeric(),
+    reasoning_ru = character(),
+    tactic_tag = character(),
+    technique_tag = character()
+  )
+}
+
 #' Export visualization artifacts to JSON for the React webapp
 #'
 #' @param tools Optional visualization tools data frame.
@@ -105,11 +162,19 @@ export_webapp_data <- function(
   refinement_summary_view <- data.frame(stringsAsFactors = FALSE)
 
   if (is.null(visualization_tools)) {
-    visualization_tools <- load_pipeline_rds(file.path(data_dir, "visualization_tools.rds"), required = TRUE)
+    visualization_tools <- load_pipeline_rds(file.path(data_dir, "visualization_tools.rds"), required = FALSE)
+    if (is.null(visualization_tools)) {
+      visualization_tools <- .webapp_empty_tools()
+      log_message(sprintf("Visualization tools artifact is absent in %s; exporting an empty webapp dataset.", data_dir), level = "WARN")
+    }
   }
 
   if (is.null(visualization_matrix)) {
-    visualization_matrix <- load_pipeline_rds(file.path(data_dir, "visualization_tool_matrix.rds"), required = TRUE)
+    visualization_matrix <- load_pipeline_rds(file.path(data_dir, "visualization_tool_matrix.rds"), required = FALSE)
+    if (is.null(visualization_matrix)) {
+      visualization_matrix <- .webapp_empty_matrix()
+      log_message(sprintf("Visualization matrix artifact is absent in %s; exporting an empty MITRE matrix.", data_dir), level = "WARN")
+    }
   }
 
   if (is.null(refinement_candidates)) {

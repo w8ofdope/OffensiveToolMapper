@@ -1,5 +1,5 @@
 get_default_llm_provider <- function() {
-  provider <- get_runtime_env_value("LLM_PROVIDER", unset = "deepseek")
+  provider <- get_runtime_env_value("LLM_PROVIDER", unset = "openai")
   provider <- tolower(stringr::str_squish(provider))
 
   if (!provider %in% c("deepseek", "openai")) {
@@ -20,7 +20,7 @@ get_default_llm_model <- function(provider = get_default_llm_provider()) {
   switch(
     provider,
     deepseek = "deepseek-chat",
-    openai = "gpt-4o",
+    openai = "gpt-4.1-mini",
     stop(sprintf("Unsupported LLM provider '%s'.", provider), call. = FALSE)
   )
 }
@@ -39,6 +39,11 @@ get_default_llm_base_url <- function(provider = get_default_llm_provider()) {
     openai = "https://api.openai.com/v1",
     stop(sprintf("Unsupported LLM provider '%s'.", provider), call. = FALSE)
   )
+}
+
+.llm_normalize_base_url <- function(base_url) {
+  normalized <- stringr::str_squish(as.character(base_url))
+  gsub("/+$", "", normalized)
 }
 
 get_llm_api_key <- function(provider = get_default_llm_provider()) {
@@ -87,6 +92,7 @@ get_default_llm_max_records <- function() {
   } else {
     get_default_llm_base_url(normalized_provider)
   }
+  resolved_base_url <- .llm_normalize_base_url(resolved_base_url)
 
   switch(
     normalized_provider,

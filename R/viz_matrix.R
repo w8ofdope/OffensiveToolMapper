@@ -1,5 +1,6 @@
 if (getRversion() >= "2.15.1") {
   utils::globalVariables(c(
+    ".data",
     "record_id",
     "tactic",
     "technique_id",
@@ -54,7 +55,7 @@ plot_mitre_heatmap <- function(visualization_matrix, top_n_techniques = 25L) {
     return(
       ggplot2::ggplot() +
         ggplot2::theme_void() +
-        ggplot2::labs(title = "MITRE heatmap", subtitle = "No matrix rows available")
+        ggplot2::labs(title = "Тепловая карта MITRE", subtitle = "Нет строк матрицы")
     )
   }
 
@@ -90,15 +91,22 @@ plot_mitre_heatmap <- function(visualization_matrix, top_n_techniques = 25L) {
   technique_levels <- technique_totals[["technique_label"]][order(technique_totals[["tool_count"]])]
   heatmap_data[["technique_label"]] <- factor(heatmap_data[["technique_label"]], levels = technique_levels)
 
-  ggplot2::ggplot(heatmap_data, ggplot2::aes_string(x = "tactic", y = "technique_label", fill = "tool_count")) +
+  ggplot2::ggplot(
+    heatmap_data,
+    ggplot2::aes(
+      x = .data[["tactic"]],
+      y = .data[["technique_label"]],
+      fill = .data[["tool_count"]]
+    )
+  ) +
     ggplot2::geom_tile(color = "#f3efe6", linewidth = 0.4) +
     ggplot2::scale_fill_gradient(low = "#f5e6bf", high = "#b44f24") +
     ggplot2::labs(
-      title = "MITRE ATT&CK Heatmap",
-      subtitle = "Количество релевантных инструментов на tactic/technique",
+      title = "Тепловая карта MITRE ATT&CK",
+      subtitle = "Количество релевантных инструментов на тактику и технику",
       x = NULL,
       y = NULL,
-      fill = "Tools"
+      fill = "Инструменты"
     ) +
     .viz_plot_theme() +
     ggplot2::theme(
@@ -119,7 +127,7 @@ plot_tactic_distribution <- function(visualization_matrix) {
     return(
       ggplot2::ggplot() +
         ggplot2::theme_void() +
-        ggplot2::labs(title = "MITRE tactics", subtitle = "No matrix rows available")
+        ggplot2::labs(title = "Тактики MITRE", subtitle = "Нет строк матрицы")
     )
   }
 
@@ -129,15 +137,22 @@ plot_tactic_distribution <- function(visualization_matrix) {
   distribution <- distribution[order(distribution[["tool_count"]]), , drop = FALSE]
   distribution[["tactic_label"]] <- factor(distribution[["tactic"]], levels = distribution[["tactic"]])
 
-  ggplot2::ggplot(distribution, ggplot2::aes_string(x = "tactic_label", y = "tool_count", fill = "tool_count")) +
+  ggplot2::ggplot(
+    distribution,
+    ggplot2::aes(
+      x = .data[["tactic_label"]],
+      y = .data[["tool_count"]],
+      fill = .data[["tool_count"]]
+    )
+  ) +
     ggplot2::geom_col(show.legend = FALSE) +
     ggplot2::coord_flip() +
     ggplot2::scale_fill_gradient(low = "#d8ecd5", high = "#1b6b52") +
     ggplot2::labs(
-      title = "MITRE Tactic Distribution",
+      title = "Распределение тактик MITRE",
       subtitle = "Сколько инструментов связано с каждой тактикой",
       x = NULL,
-      y = "Tools"
+      y = "Инструменты"
     ) +
     .viz_plot_theme()
 }

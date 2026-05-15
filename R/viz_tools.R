@@ -1,5 +1,5 @@
 if (getRversion() >= "2.15.1") {
-  utils::globalVariables(c("tool_count"))
+  utils::globalVariables(c(".data", "tool_count"))
 }
 
 .viz_tools_require_columns <- function(data, required_columns, data_name) {
@@ -42,7 +42,7 @@ plot_tools_by_source <- function(visualization_tools) {
     return(
       ggplot2::ggplot() +
         ggplot2::theme_void() +
-        ggplot2::labs(title = "Sources", subtitle = "No visualization rows available")
+        ggplot2::labs(title = "Источники", subtitle = "Нет строк для визуализации")
     )
   }
 
@@ -54,15 +54,22 @@ plot_tools_by_source <- function(visualization_tools) {
     dplyr::count(.data[["source"]], .data[["entity_type"]], name = "tool_count") |>
     tibble::as_tibble()
 
-  ggplot2::ggplot(source_data, ggplot2::aes_string(x = "source", y = "tool_count", fill = "entity_type")) +
+  ggplot2::ggplot(
+    source_data,
+    ggplot2::aes(
+      x = .data[["source"]],
+      y = .data[["tool_count"]],
+      fill = .data[["entity_type"]]
+    )
+  ) +
     ggplot2::geom_col(position = "stack") +
     ggplot2::scale_fill_brewer(palette = "Set2") +
     ggplot2::labs(
-      title = "Tools by Source",
+      title = "Инструменты по источникам",
       subtitle = "Распределение релевантных инструментов по источникам",
       x = NULL,
-      y = "Tools",
-      fill = "Entity type"
+      y = "Инструменты",
+      fill = "Тип"
     ) +
     .viz_tools_plot_theme() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 18, hjust = 1))
@@ -83,7 +90,7 @@ plot_top_tools <- function(visualization_tools, top_n = 15L) {
     return(
       ggplot2::ggplot() +
         ggplot2::theme_void() +
-        ggplot2::labs(title = "Top tools", subtitle = "No visualization rows available")
+        ggplot2::labs(title = "Лучшие инструменты", subtitle = "Нет строк для визуализации")
     )
   }
 
@@ -93,10 +100,17 @@ plot_top_tools <- function(visualization_tools, top_n = 15L) {
   ranking <- ranking[order(ranking[["visualization_score"]]), , drop = FALSE]
   ranking[["assessed_name_ordered"]] <- factor(ranking[["assessed_name"]], levels = ranking[["assessed_name"]])
 
-  ggplot2::ggplot(ranking, ggplot2::aes_string(x = "visualization_score", y = "assessed_name_ordered", fill = "entity_type")) +
+  ggplot2::ggplot(
+    ranking,
+    ggplot2::aes(
+      x = .data[["visualization_score"]],
+      y = .data[["assessed_name_ordered"]],
+      fill = .data[["entity_type"]]
+    )
+  ) +
     ggplot2::geom_col() +
     ggplot2::geom_text(
-      ggplot2::aes(label = sprintf("%.2f", ranking[["visualization_score"]])),
+      ggplot2::aes(label = sprintf("%.2f", .data[["visualization_score"]])),
       hjust = -0.15,
       size = 3.4,
       color = "#453d36"
@@ -104,11 +118,11 @@ plot_top_tools <- function(visualization_tools, top_n = 15L) {
     ggplot2::scale_fill_brewer(palette = "Set2") +
     ggplot2::expand_limits(x = max(ranking$visualization_score, na.rm = TRUE) + 0.08) +
     ggplot2::labs(
-      title = "Top Ranked Tools",
+      title = "Инструменты с лучшим рейтингом",
       subtitle = "Порядок для верхней части визуализации после LLM",
-      x = "Visualization score",
+      x = "Оценка для визуализации",
       y = NULL,
-      fill = "Entity type"
+      fill = "Тип"
     ) +
     .viz_tools_plot_theme()
 }
@@ -124,17 +138,20 @@ plot_confidence_distribution <- function(visualization_tools) {
     return(
       ggplot2::ggplot() +
         ggplot2::theme_void() +
-        ggplot2::labs(title = "Confidence", subtitle = "No visualization rows available")
+        ggplot2::labs(title = "Уверенность", subtitle = "Нет строк для визуализации")
     )
   }
 
-  ggplot2::ggplot(visualization_tools, ggplot2::aes_string(x = "confidence_score")) +
+  ggplot2::ggplot(
+    visualization_tools,
+    ggplot2::aes(x = .data[["confidence_score"]])
+  ) +
     ggplot2::geom_histogram(binwidth = 0.05, fill = "#355c7d", color = "#fbf7ef", linewidth = 0.4) +
     ggplot2::labs(
-      title = "Confidence Distribution",
-      subtitle = "Распределение post-LLM confidence",
-      x = "Confidence score",
-      y = "Tools"
+      title = "Распределение уверенности",
+      subtitle = "Распределение уверенности после LLM",
+      x = "Оценка уверенности",
+      y = "Инструменты"
     ) +
     .viz_tools_plot_theme()
 }

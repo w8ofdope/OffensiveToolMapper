@@ -35,10 +35,68 @@
   )
 }
 
+.mcp_empty_tools <- function() {
+  tibble::tibble(
+    record_id = character(),
+    assessed_name = character(),
+    source = character(),
+    source_type = character(),
+    url = character(),
+    date_found = character(),
+    entity_type = character(),
+    category_ru = character(),
+    short_description_ru = character(),
+    long_description_ru = character(),
+    summary_ru = character(),
+    purpose_ru = character(),
+    capabilities_ru = list(),
+    reason_ru = character(),
+    pre_llm_score = numeric(),
+    pre_llm_priority = character(),
+    confidence_score = numeric(),
+    detail_score = numeric(),
+    mitre_score = numeric(),
+    entity_priority_score = numeric(),
+    visualization_score = numeric(),
+    overall_confidence = numeric(),
+    llm_provider = character(),
+    llm_model = character(),
+    mitre_tactics = list(),
+    mitre_technique_ids = list(),
+    mitre_technique_names = list(),
+    mitre_tactic_count = integer(),
+    mitre_technique_count = integer(),
+    filter_tags = list(),
+    visualization_rank = integer(),
+    mitre_matrix = list()
+  )
+}
+
+.mcp_empty_matrix <- function() {
+  tibble::tibble(
+    record_id = character(),
+    assessed_name = character(),
+    source = character(),
+    url = character(),
+    entity_type = character(),
+    category_ru = character(),
+    technique_id = character(),
+    technique_name = character(),
+    tactic = character(),
+    confidence = numeric(),
+    reasoning_ru = character(),
+    tactic_tag = character(),
+    technique_tag = character()
+  )
+}
+
 .mcp_load_visualization_artifacts <- function(data_dir = get_default_data_dir()) {
+  tools <- load_pipeline_rds(file.path(data_dir, "visualization_tools.rds"), required = FALSE)
+  matrix <- load_pipeline_rds(file.path(data_dir, "visualization_tool_matrix.rds"), required = FALSE)
+
   list(
-    tools = load_pipeline_rds(file.path(data_dir, "visualization_tools.rds"), required = TRUE),
-    matrix = load_pipeline_rds(file.path(data_dir, "visualization_tool_matrix.rds"), required = TRUE)
+    tools = if (is.data.frame(tools)) tools else .mcp_empty_tools(),
+    matrix = if (is.data.frame(matrix)) matrix else .mcp_empty_matrix()
   )
 }
 
@@ -161,6 +219,24 @@
   )
 }
 
+.mcp_count_breakdown <- function(values, value_name) {
+  values <- as.character(values)
+  values <- values[!is.na(values) & nzchar(values)]
+
+  if (length(values) == 0) {
+    return(tibble::tibble(
+      !!value_name := character(),
+      count = integer()
+    ))
+  }
+
+  counted <- sort(table(values), decreasing = TRUE)
+  tibble::tibble(
+    !!value_name := names(counted),
+    count = as.integer(counted)
+  )
+}
+
 #' Search mapped offensive tools for MCP clients
 #'
 #' @param query Optional search query.
@@ -280,14 +356,9 @@ get_technique_tools <- function(technique_id, limit = 20L, data_dir = get_defaul
 get_statistics <- function(data_dir = get_default_data_dir()) {
   artifacts <- .mcp_load_visualization_artifacts(data_dir)
 
-  source_breakdown <- tibble::as_tibble(sort(table(artifacts$tools[["source"]]), decreasing = TRUE), .name_repair = "minimal")
-  names(source_breakdown) <- c("source", "count")
-
-  entity_breakdown <- tibble::as_tibble(sort(table(artifacts$tools[["entity_type"]]), decreasing = TRUE), .name_repair = "minimal")
-  names(entity_breakdown) <- c("entity_type", "count")
-
-  tactic_breakdown <- tibble::as_tibble(sort(table(artifacts$matrix[["tactic"]]), decreasing = TRUE), .name_repair = "minimal")
-  names(tactic_breakdown) <- c("tactic", "count")
+  source_breakdown <- .mcp_count_breakdown(artifacts$tools[["source"]], "source")
+  entity_breakdown <- .mcp_count_breakdown(artifacts$tools[["entity_type"]], "entity_type")
+  tactic_breakdown <- .mcp_count_breakdown(artifacts$matrix[["tactic"]], "tactic")
 
   list(
     tool_count = nrow(artifacts$tools),

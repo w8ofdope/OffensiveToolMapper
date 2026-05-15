@@ -69,12 +69,12 @@ provider <- get_default_llm_provider()
 runtime_config <- get_llm_runtime_config(provider)
 max_records <- get_default_llm_max_records()
 collect_mode <- match.arg(
-  Sys.getenv("OTM_COLLECT_MODE", unset = "incremental"),
+  get_runtime_env_value("OTM_COLLECT_MODE", unset = "incremental"),
   choices = c("incremental", "snapshot")
 )
-github_min_stars <- as.integer(Sys.getenv("OTM_GITHUB_MIN_STARS", unset = "10"))
-github_max_results <- as.integer(Sys.getenv("OTM_GITHUB_MAX_RESULTS", unset = "100"))
-github_max_search_requests <- as.integer(Sys.getenv("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "60"))
+github_min_stars <- as.integer(get_runtime_env_value("OTM_GITHUB_MIN_STARS", unset = "10"))
+github_max_results <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_RESULTS", unset = "100"))
+github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "60"))
 
 log_message(sprintf(
   "Verification run preflight: previous_run_id=%s provider=%s model=%s base_url=%s api_key_present=%s collect_mode=%s",

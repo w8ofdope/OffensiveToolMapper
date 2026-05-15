@@ -172,8 +172,22 @@ build_validation_enrichment_prompt <- function(record) {
         httr2::req_headers(
           Authorization = paste("Bearer", api_key),
           "Content-Type" = "application/json"
-        ) |>
-        httr2::req_body_json(data = request_body, auto_unbox = TRUE)
+        )
+
+      if (identical(provider_config$provider, "openai")) {
+        organization_id <- get_runtime_env_value("OPENAI_ORG_ID", unset = "")
+        project_id <- get_runtime_env_value("OPENAI_PROJECT_ID", unset = "")
+
+        if (nzchar(organization_id)) {
+          request <- httr2::req_headers(request, "OpenAI-Organization" = organization_id)
+        }
+
+        if (nzchar(project_id)) {
+          request <- httr2::req_headers(request, "OpenAI-Project" = project_id)
+        }
+      }
+
+      request <- httr2::req_body_json(request, data = request_body, auto_unbox = TRUE)
 
       safe_json_request(
         request = request,

@@ -25,12 +25,50 @@ import {
 } from 'recharts'
 
 const R_DASHBOARD_URL = import.meta.env.VITE_R_DASHBOARD_URL || 'http://127.0.0.1:8788'
+const DATA_REFRESH_INTERVAL_MS = 45000
+const SELECTED_TOOL_STORAGE_KEY = 'otm:selected-tool-id'
+const CURRENT_TAB_STORAGE_KEY = 'otm:current-tab'
 const accentPalette = ['#ff7a3d', '#40b9b4', '#ffd166', '#8ecae6', '#fb8500', '#5dd39e']
 const headerTabs = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'analytics', label: 'Analytics' },
-  { id: 'explorer', label: 'Explorer' },
+  { id: 'overview', label: 'Обзор' },
+  { id: 'analytics', label: 'Аналитика' },
+  { id: 'explorer', label: 'Инструменты' },
 ]
+
+const tacticDetails = {
+  Reconnaissance: 'Сбор первичной информации о целях, инфраструктуре, пользователях и внешнем периметре до активного доступа.',
+  'Resource Development': 'Подготовка ресурсов для операции: домены, инфраструктура, учётки, полезные нагрузки и вспомогательные сервисы.',
+  'Initial Access': 'Получение начальной точки входа в среду через уязвимость, публичный сервис, фишинг или внешний доступ.',
+  Execution: 'Запуск команд, скриптов или полезной нагрузки на целевой системе.',
+  Persistence: 'Закрепление доступа, чтобы вернуться в систему после перезапуска, смены сессии или устранения первичного входа.',
+  'Privilege Escalation': 'Повышение прав, переход от обычного пользователя к более привилегированному контексту.',
+  'Defense Evasion': 'Снижение заметности: обход защит, маскировка активности, отключение или затруднение детекта.',
+  'Credential Access': 'Получение паролей, токенов, хэшей и других материалов для дальнейшего доступа.',
+  Discovery: 'Разведка уже внутри среды: пользователи, процессы, хосты, сети, домены, сервисы и права.',
+  'Lateral Movement': 'Перемещение между системами внутри сети с использованием доступов, удалённого выполнения или доверенных каналов.',
+  Collection: 'Сбор данных внутри среды перед выгрузкой или дальнейшей обработкой.',
+  Exfiltration: 'Вывод собранных данных из среды наружу через сетевые, облачные или иные каналы.',
+  'Command and Control': 'Поддержание канала управления между оператором и инструментом внутри среды.',
+  Impact: 'Действия, которые нарушают доступность, целостность или бизнес-процесс цели.',
+}
+
+const techniqueHints = {
+  T1003: 'Получение учётных данных из памяти, хранилищ ОС или связанных credential-артефактов.',
+  T1018: 'Поиск удалённых систем, узлов и доступных направлений для дальнейшего движения.',
+  T1021: 'Использование удалённых сервисов для перехода на другие машины или выполнения действий внутри сети.',
+  T1041: 'Передача данных через тот же канал, который используется для управления или связи.',
+  T1055: 'Встраивание кода в другой процесс, чтобы скрыть выполнение или получить контекст процесса.',
+  T1059: 'Запуск команд и скриптов через shell, PowerShell, Python, JavaScript или другие интерпретаторы.',
+  T1105: 'Передача файлов и полезной нагрузки между внешней инфраструктурой и целевой средой.',
+  T1133: 'Использование VPN, RDP, SSH, внешних панелей или других exposed remote access сервисов.',
+  T1190: 'Эксплуатация уязвимого публичного приложения или сервиса для начального входа.',
+  T1548: 'Злоупотребление механизмами повышения прав или обхода контроля привилегий.',
+  T1562: 'Отключение, обход или ослабление защитных механизмов и средств мониторинга.',
+  T1573: 'Защита C2-канала шифрованием или нестандартным туннелированием связи.',
+  T1583: 'Создание или аренда инфраструктуры: доменов, серверов, учёток, сертификатов и связанных ресурсов.',
+  T1588: 'Получение готовых возможностей: инструментов, эксплойтов, сертификатов, аккаунтов или инфраструктуры.',
+  T1595: 'Активное сканирование внешнего периметра, сервисов или адресов для поиска целей и уязвимостей.',
+}
 
 function normaliseRecordList(value) {
   if (!value) {
@@ -78,7 +116,7 @@ function normaliseBoolean(value) {
 
 function formatScore(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return 'n/a'
+    return 'н/д'
   }
 
   return Number(value).toFixed(2)
@@ -86,7 +124,7 @@ function formatScore(value) {
 
 function rankLabel(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return 'n/a'
+    return 'н/д'
   }
 
   return `#${value}`
@@ -142,7 +180,7 @@ function splitKeywords(value) {
 
 function shortenLabel(value, maxLength = 22) {
   if (!value) {
-    return 'n/a'
+    return 'н/д'
   }
 
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value
@@ -158,24 +196,24 @@ function deriveCoverageSummary(tools, matrix) {
 
   return [
     {
-      label: 'Mapped tools',
+      label: 'Инструменты со связями',
       value: mappedTools.length,
       meta: 'Утилиты с хотя бы одной MITRE-связью',
     },
     {
-      label: 'Unique tactics',
+      label: 'Уникальные тактики',
       value: uniqueTactics,
       meta: 'Разные тактики, покрытые текущим набором',
     },
     {
-      label: 'Unique techniques',
+      label: 'Уникальные техники',
       value: uniqueTechniques,
-      meta: 'Уникальные technique_id в текущем matrix-layer',
+      meta: 'Уникальные идентификаторы техник в текущем слое матрицы',
     },
     {
-      label: 'Avg techniques',
+      label: 'Среднее техник',
       value: formatScore(avgTechniques),
-      meta: 'Среднее число техник на mapped utility',
+      meta: 'Среднее число техник на связанный инструмент',
     },
   ]
 }
@@ -404,6 +442,91 @@ function deriveMitreHeatmap(matrix) {
   }
 }
 
+function tacticDescription(tactic) {
+  return tacticDetails[tactic] || 'Тактика описывает крупную цель поведения: зачем инструмент использует связанные техники в этой части цепочки.'
+}
+
+function describeTechnique(row) {
+  const normalizedId = String(row?.technique_id || '').split('.')[0]
+
+  if (techniqueHints[row?.technique_id]) {
+    return techniqueHints[row.technique_id]
+  }
+
+  if (techniqueHints[normalizedId]) {
+    return techniqueHints[normalizedId]
+  }
+
+  return `Техника описывает действие или возможность из MITRE ATT&CK: ${row?.technique_name || 'название пока не указано'}.`
+}
+
+function cleanDisplayTags(tags) {
+  return normaliseArray(tags)
+    .map((tag) => String(tag).trim())
+    .filter(Boolean)
+    .filter((tag) => !/^mitre:/i.test(tag))
+    .filter((tag) => !/^source:/i.test(tag))
+    .filter((tag) => !/^entity:/i.test(tag))
+    .filter((tag) => !/^category:/i.test(tag))
+}
+
+function formatMetaValue(value) {
+  if (value === null || value === undefined || !String(value).trim()) {
+    return 'н/д'
+  }
+
+  return String(value)
+}
+
+function formatUpdatedAt(value) {
+  if (!value) {
+    return 'ещё не обновлялось'
+  }
+
+  return new Date(value).toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
+function deriveSelectedTtpGroups(selectedMatrix) {
+  const groups = new Map()
+
+  for (const row of selectedMatrix) {
+    const tactics = splitTactics(row.tactic)
+    const visibleTactics = tactics.length ? tactics : ['Тактика не указана']
+
+    for (const tactic of visibleTactics) {
+      if (!groups.has(tactic)) {
+        groups.set(tactic, {
+          tactic,
+          description: tacticDescription(tactic),
+          techniques: [],
+        })
+      }
+
+      groups.get(tactic).techniques.push({
+        ...row,
+        technique_description: describeTechnique(row),
+      })
+    }
+  }
+
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    avgConfidence: group.techniques.length
+      ? group.techniques.reduce((sum, row) => sum + Number(row.confidence || 0), 0) / group.techniques.length
+      : 0,
+  })).sort((left, right) => {
+    if (right.techniques.length !== left.techniques.length) {
+      return right.techniques.length - left.techniques.length
+    }
+
+    return left.tactic.localeCompare(right.tactic)
+  })
+}
+
 function sortRefinementRows(left, right) {
   const leftMapped = left.already_mapped ? 1 : 0
   const rightMapped = right.already_mapped ? 1 : 0
@@ -425,29 +548,29 @@ function deriveRefinementSummary(refinement) {
 
   return [
     {
-      label: 'Candidate rows',
+      label: 'Кандидаты',
       value: refinement.length,
-      meta: 'Все retrieval-кандидаты из refinement-layer',
+      meta: 'Все дополнительные кандидаты из слоя уточнения',
     },
     {
-      label: 'Needs review',
+      label: 'На проверку',
       value: gaps.length,
-      meta: 'Новые unmapped suggestions для ручной валидации',
+      meta: 'Новые связи, которых ещё нет в основной матрице',
     },
     {
-      label: 'Tools with gaps',
+      label: 'Инструменты с зазорами',
       value: new Set(gaps.map((row) => row.record_id).filter(Boolean)).size,
-      meta: 'Сколько tool profiles получили новые MITRE-кандидаты',
+      meta: 'Сколько профилей получили новые MITRE-кандидаты',
     },
     {
-      label: 'Mapped confirmations',
+      label: 'Уже подтверждено',
       value: mapped.length,
-      meta: 'Кандидаты, которые совпали с уже существующим mapping-layer',
+      meta: 'Кандидаты, которые совпали с текущей матрицей',
     },
     {
-      label: 'Gap techniques',
+      label: 'Новые техники',
       value: new Set(gaps.map((row) => row.technique_id).filter(Boolean)).size,
-      meta: 'Уникальные techniques среди unmapped candidates',
+      meta: 'Уникальные техники среди новых кандидатов',
     },
   ]
 }
@@ -595,13 +718,13 @@ function MetricCard({ icon: Icon, label, value, meta }) {
 function HeatmapLegend() {
   return (
     <div className="heatmap-legend">
-      <span>Меньше coverage</span>
+      <span>Меньше связей</span>
       <div className="heatmap-legend-scale">
         {[0.12, 0.22, 0.38, 0.58, 0.78].map((alpha) => (
           <span key={alpha} style={{ backgroundColor: `rgba(180, 35, 24, ${alpha})` }} />
         ))}
       </div>
-      <span>Больше coverage</span>
+      <span>Больше связей</span>
     </div>
   )
 }
@@ -615,7 +738,7 @@ function MitreHeatmapMatrix({ heatmap, tacticLimit, rowLimit }) {
     <div className="mitre-heatmap-scroll">
       <div className="mitre-heatmap-table">
         <div className="mitre-heatmap-row mitre-heatmap-header-row" style={{ gridTemplateColumns }}>
-          <div className="mitre-heatmap-technique-header">Technique</div>
+          <div className="mitre-heatmap-technique-header">Техника</div>
           {visibleTactics.map((tactic) => (
             <div key={tactic} className="mitre-heatmap-tactic-header">
               {tactic}
@@ -640,7 +763,7 @@ function MitreHeatmapMatrix({ heatmap, tacticLimit, rowLimit }) {
                   key={`${row.technique_id}-${cell.tactic}`}
                   className={`mitre-heatmap-cell ${cell.count > 0 ? 'is-active' : ''}`}
                   style={{ backgroundColor }}
-                  title={`${row.technique_id} / ${cell.tactic}: ${cell.count} utilities`}
+                  title={`${row.technique_id} / ${cell.tactic}: ${cell.count} утилит`}
                 >
                   {cell.count > 0 ? cell.count : '·'}
                 </div>
@@ -658,13 +781,15 @@ function App() {
   const [tools, setTools] = useState([])
   const [matrix, setMatrix] = useState([])
   const [refinement, setRefinement] = useState([])
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedId, setSelectedId] = useState(() => window.localStorage.getItem(SELECTED_TOOL_STORAGE_KEY))
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState('All')
   const [tacticFilter, setTacticFilter] = useState('All')
-  const [currentTab, setCurrentTab] = useState('overview')
+  const [currentTab, setCurrentTab] = useState(() => window.localStorage.getItem(CURRENT_TAB_STORAGE_KEY) || 'overview')
   const [isHeatmapOpen, setIsHeatmapOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState(null)
   const [error, setError] = useState('')
 
   const deferredSearch = useDeferredValue(search.trim().toLowerCase())
@@ -672,20 +797,26 @@ function App() {
   useEffect(() => {
     let cancelled = false
 
-    async function loadData() {
+    async function loadData({ background = false } = {}) {
       try {
-        setLoading(true)
-        setError('')
+        if (background) {
+          setRefreshing(true)
+        } else {
+          setLoading(true)
+          setError('')
+        }
+
+        const cacheKey = `v=${Date.now()}`
 
         const [summaryResponse, toolsResponse, matrixResponse, refinementResponse] = await Promise.all([
-          fetch('/data/summary.json'),
-          fetch('/data/tools.json'),
-          fetch('/data/matrix.json'),
-          fetch('/data/refinement.json'),
+          fetch(`/data/summary.json?${cacheKey}`, { cache: 'no-store' }),
+          fetch(`/data/tools.json?${cacheKey}`, { cache: 'no-store' }),
+          fetch(`/data/matrix.json?${cacheKey}`, { cache: 'no-store' }),
+          fetch(`/data/refinement.json?${cacheKey}`, { cache: 'no-store' }),
         ])
 
         if (!summaryResponse.ok || !toolsResponse.ok || !matrixResponse.ok) {
-          throw new Error('Не удалось загрузить экспортированные JSON-данные для modern UI.')
+          throw new Error('Не удалось загрузить экспортированные JSON-данные для веб-интерфейса.')
         }
 
         const [summaryPayload, toolsPayload, matrixPayload, refinementPayload] = await Promise.all([
@@ -700,13 +831,15 @@ function App() {
         }
 
         setSummary(summaryPayload)
-        setTools((toolsPayload || []).map((tool) => ({
+        const nextTools = (toolsPayload || []).map((tool) => ({
           ...tool,
           filter_tags: normaliseArray(tool.filter_tags),
           mitre_tactics: normaliseArray(tool.mitre_tactics),
           mitre_technique_ids: normaliseArray(tool.mitre_technique_ids),
           mitre_technique_names: normaliseArray(tool.mitre_technique_names),
-        })))
+        }))
+
+        setTools(nextTools)
         setMatrix(matrixPayload || [])
         setRefinement((refinementPayload || []).map((row) => ({
           ...row,
@@ -714,22 +847,42 @@ function App() {
           tactic_names: normaliseArray(row.tactic_names),
           matched_terms: splitKeywords(row.matched_terms),
         })))
-        setSelectedId(toolsPayload?.[0]?.record_id || null)
+        setSelectedId((currentSelectedId) => {
+          if (currentSelectedId && nextTools.some((tool) => tool.record_id === currentSelectedId)) {
+            return currentSelectedId
+          }
+
+          const storedSelectedId = window.localStorage.getItem(SELECTED_TOOL_STORAGE_KEY)
+          if (storedSelectedId && nextTools.some((tool) => tool.record_id === storedSelectedId)) {
+            return storedSelectedId
+          }
+
+          return nextTools[0]?.record_id || null
+        })
+        setLastUpdated(new Date().toISOString())
       } catch (loadError) {
-        if (!cancelled) {
+        if (!cancelled && !background) {
           setError(loadError.message)
         }
       } finally {
         if (!cancelled) {
-          setLoading(false)
+          if (background) {
+            setRefreshing(false)
+          } else {
+            setLoading(false)
+          }
         }
       }
     }
 
     loadData()
+    const refreshTimer = window.setInterval(() => {
+      loadData({ background: true })
+    }, DATA_REFRESH_INTERVAL_MS)
 
     return () => {
       cancelled = true
+      window.clearInterval(refreshTimer)
     }
   }, [])
 
@@ -745,21 +898,33 @@ function App() {
   const selectedMatrix = selectedTool
     ? matrix.filter((row) => row.record_id === selectedTool.record_id)
     : []
+  const selectedTtpGroups = deriveSelectedTtpGroups(selectedMatrix)
   const selectedRefinement = selectedTool
     ? refinement.filter((row) => row.record_id === selectedTool.record_id).sort(sortRefinementRows)
     : []
+  const selectedDisplayTags = selectedTool ? cleanDisplayTags(selectedTool.filter_tags) : []
 
   useEffect(() => {
-    if (!filteredTools.length) {
+    if (!tools.length) {
       return
     }
 
-    if (!selectedTool || !filteredTools.some((tool) => tool.record_id === selectedTool.record_id)) {
+    if (!selectedTool) {
       startTransition(() => {
-        setSelectedId(filteredTools[0].record_id)
+        setSelectedId(filteredTools[0]?.record_id || tools[0].record_id)
       })
     }
-  }, [filteredTools, selectedTool])
+  }, [filteredTools, selectedTool, tools])
+
+  useEffect(() => {
+    if (selectedId) {
+      window.localStorage.setItem(SELECTED_TOOL_STORAGE_KEY, selectedId)
+    }
+  }, [selectedId])
+
+  useEffect(() => {
+    window.localStorage.setItem(CURRENT_TAB_STORAGE_KEY, currentTab)
+  }, [currentTab])
 
   useEffect(() => {
     if (!isHeatmapOpen) {
@@ -803,7 +968,7 @@ function App() {
     return (
       <main className="app-root loading-state">
         <div className="loading-orb" />
-        <p>Загрузка modern UI и аналитических данных...</p>
+        <p>Загрузка интерфейса и аналитических данных...</p>
       </main>
     )
   }
@@ -812,9 +977,9 @@ function App() {
     return (
       <main className="app-root loading-state">
         <div className="error-panel">
-          <h1>Modern UI не смог загрузить данные</h1>
+          <h1>Интерфейс не смог загрузить данные</h1>
           <p>{error}</p>
-          <p>Сначала выполни экспорт JSON через `data-raw/export_webapp_data.R`, затем перезапусти webapp.</p>
+          <p>Сначала выполни экспорт JSON через `data-raw/export_webapp_data.R`, затем перезапусти веб-интерфейс.</p>
         </div>
       </main>
     )
@@ -827,11 +992,11 @@ function App() {
           <div className="site-brand-mark">OTM</div>
           <div>
             <div className="site-brand-title">OffensiveToolMapper</div>
-            <div className="site-brand-subtitle">modern intelligence cockpit</div>
+            <div className="site-brand-subtitle">ранжированная разведка по инструментам</div>
           </div>
         </div>
 
-        <nav className="site-nav-tabs" aria-label="Page sections">
+        <nav className="site-nav-tabs" aria-label="Разделы страницы">
           {headerTabs.map((tab) => (
             <button
               key={tab.id}
@@ -845,8 +1010,13 @@ function App() {
         </nav>
 
         <div className="site-header-actions">
+          <div className={`refresh-status ${refreshing ? 'is-refreshing' : ''}`}>
+            <span />
+            <strong>{refreshing ? 'Обновление данных' : 'Фоновые данные'}</strong>
+            <em>{formatUpdatedAt(lastUpdated)}</em>
+          </div>
           <a className="primary-action header-dashboard-link" href={R_DASHBOARD_URL} target="_blank" rel="noreferrer">
-            R dashboard <ExternalLink size={15} />
+            R-панель <ExternalLink size={15} />
           </a>
         </div>
       </header>
@@ -855,16 +1025,16 @@ function App() {
       <>
       <section className="hero-shell" id="overview">
         <div className="hero-copy-modern glass-panel">
-          <div className="eyebrow-modern">Offensive tooling intelligence</div>
-          <h1>Каталог offensive utilities, сигналов и MITRE-связей в более продуктовой оболочке</h1>
+          <div className="eyebrow-modern">Разведка по наступательным инструментам</div>
+          <h1>Каталог утилит, сигналов и MITRE-связей в продуктовой оболочке</h1>
           <p>
-            Здесь собраны уже отфильтрованные и оценённые offensive tools: удобнее смотреть,
+            Здесь собраны уже отфильтрованные и оценённые инструменты: удобнее смотреть,
             какие утилиты реально выходят наверх, из каких источников они приходят, как покрывают
             MITRE ATT&CK и какие записи сейчас выглядят наиболее содержательными и полезными.
           </p>
           <div className="hero-actions">
             <button type="button" className="primary-action action-button" onClick={() => setCurrentTab('explorer')}>
-              Перейти к explorer <ArrowRight size={16} />
+              Перейти к инструментам <ArrowRight size={16} />
             </button>
             <button type="button" className="secondary-action action-button" onClick={() => setCurrentTab('analytics')}>
               Смотреть аналитику <Radar size={16} />
@@ -873,20 +1043,20 @@ function App() {
           <div className="hero-strip">
             <MetricCard
               icon={Sparkles}
-              label="UI-ready tools"
+              label="Готовые карточки"
               value={summary?.tool_count || tools.length}
-              meta="LLM-оценка, описание, MITRE mapping"
+              meta="LLM-оценка, описание, MITRE-связи"
             />
             <MetricCard
               icon={Layers3}
-              label="MITRE links"
+              label="MITRE-связи"
               value={summary?.matrix_count || matrix.length}
-              meta="Связи tool -> tactic/technique"
+              meta="Инструмент -> тактика -> техника"
             />
             <MetricCard
               icon={Shield}
-              label="Top rank"
-              value={featuredTool ? rankLabel(featuredTool.visualization_rank) : 'n/a'}
+              label="Первое место"
+              value={featuredTool ? rankLabel(featuredTool.visualization_rank) : 'н/д'}
               meta={featuredTool ? featuredTool.assessed_name : 'Нет данных'}
             />
           </div>
@@ -894,41 +1064,43 @@ function App() {
 
         <aside className="hero-spotlight-modern glass-panel">
           <div className="spotlight-topline">
-            <span className="eyebrow-modern">Featured signal</span>
-            <span className="spotlight-rank">{featuredTool ? rankLabel(featuredTool.visualization_rank) : 'n/a'}</span>
+            <span className="eyebrow-modern">Главный сигнал</span>
+            <span className="spotlight-rank">{featuredTool ? rankLabel(featuredTool.visualization_rank) : 'н/д'}</span>
           </div>
           <h2>{featuredTool?.assessed_name || 'Нет данных'}</h2>
           <p>{featuredTool?.short_description_ru || 'Описание недоступно.'}</p>
           <div className="spotlight-stats-grid">
             <div>
-              <span>Source</span>
-              <strong>{featuredTool?.source || 'n/a'}</strong>
+              <span>Источник</span>
+              <strong>{featuredTool?.source || 'н/д'}</strong>
             </div>
             <div>
-              <span>Confidence</span>
+              <span>Уверенность</span>
               <strong>{formatScore(featuredTool?.confidence_score)}</strong>
             </div>
             <div>
-              <span>Entity</span>
-              <strong>{featuredTool?.entity_type || 'n/a'}</strong>
+              <span>Тип</span>
+              <strong>{featuredTool?.entity_type || 'н/д'}</strong>
             </div>
             <div>
               <span>MITRE</span>
-              <strong>{featuredTool?.mitre_technique_count || 0} techniques</strong>
+              <strong>{featuredTool?.mitre_technique_count || 0} техник</strong>
             </div>
           </div>
-          <div className="tag-ribbon">
-            {normaliseArray(featuredTool?.filter_tags).slice(0, 7).map((tag) => (
-              <span key={tag}>{tag}</span>
-            ))}
-          </div>
+          {cleanDisplayTags(featuredTool?.filter_tags).length > 0 && (
+            <div className="tag-ribbon">
+              {cleanDisplayTags(featuredTool?.filter_tags).slice(0, 7).map((tag) => (
+                <span key={tag}>{tag}</span>
+              ))}
+            </div>
+          )}
         </aside>
       </section>
 
       <section className="featured-ribbon-shell" id="featured-tools">
         <div className="section-heading heading-light">
           <div>
-            <div className="section-kicker-modern">Top ranked utilities</div>
+            <div className="section-kicker-modern">Лучшие утилиты</div>
             <h3>Короткий срез лучших записей из текущего визуализационного слоя</h3>
           </div>
         </div>
@@ -956,11 +1128,11 @@ function App() {
       <section className="analytics-shell" id="analytics">
         <div className="section-heading heading-light analytics-shell-heading">
           <div>
-            <div className="section-kicker-modern">MITRE coverage</div>
-            <h3>Как текущий набор offensive tools покрывает tactics и techniques</h3>
+            <div className="section-kicker-modern">Покрытие MITRE</div>
+            <h3>Как текущий набор инструментов покрывает тактики и техники</h3>
           </div>
           <p>
-            Ниже уже не просто общая аналитика, а отдельный coverage-layer: сколько утилит реально маппятся,
+            Ниже уже не просто общая аналитика, а отдельный слой покрытия: сколько утилит реально связаны с MITRE,
             какие источники несут больше уникальных техник и какие инструменты покрывают больше всего MITRE-связей.
           </p>
         </div>
@@ -978,12 +1150,12 @@ function App() {
         <article className="glass-panel refinement-summary-panel">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Refinement queue</div>
-              <h3>Где retrieval-layer нашёл дополнительные MITRE возможности</h3>
+              <div className="section-kicker-modern">Очередь уточнения</div>
+              <h3>Где слой уточнения нашёл дополнительные MITRE-возможности</h3>
             </div>
             <p>
-              Этот слой показывает не подтверждённые mapping-линки, а самые правдоподобные кандидаты,
-              которые стоит досмотреть вручную или вынести в следующий validation-pass.
+              Этот слой показывает не подтверждённые связи, а самые правдоподобные кандидаты,
+              которые стоит досмотреть вручную или вынести в следующий проход проверки.
             </p>
           </div>
           <div className="refinement-summary-grid">
@@ -1001,8 +1173,8 @@ function App() {
         <article className="glass-panel chart-card">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Coverage</div>
-              <h3>MITRE tactic pressure</h3>
+              <div className="section-kicker-modern">Покрытие</div>
+              <h3>Нагрузка по тактикам MITRE</h3>
             </div>
             <Radar size={18} />
           </div>
@@ -1024,7 +1196,7 @@ function App() {
         <article className="glass-panel chart-card">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Coverage by source</div>
+              <div className="section-kicker-modern">Покрытие по источникам</div>
               <h3>Уникальные техники по источникам</h3>
             </div>
             <Layers3 size={18} />
@@ -1047,7 +1219,7 @@ function App() {
         <article className="glass-panel chart-card">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Source mix</div>
+              <div className="section-kicker-modern">Источники</div>
               <h3>Где чаще всего находятся инструменты</h3>
             </div>
             <Flame size={18} />
@@ -1072,8 +1244,8 @@ function App() {
         <article className="glass-panel chart-card">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Technique hotspots</div>
-              <h3>Какие MITRE techniques собирают больше всего utilities</h3>
+              <div className="section-kicker-modern">Техники с высокой плотностью</div>
+              <h3>Какие техники MITRE собирают больше всего утилит</h3>
             </div>
             <Shield size={18} />
           </div>
@@ -1082,7 +1254,7 @@ function App() {
               <CartesianGrid stroke="rgba(180, 35, 24, 0.08)" horizontal={false} />
               <XAxis type="number" stroke="rgba(23, 23, 23, 0.55)" />
               <YAxis dataKey="name" type="category" width={150} stroke="rgba(23, 23, 23, 0.75)" tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid rgba(180, 35, 24, 0.10)', borderRadius: 16, color: '#171717' }} formatter={(value) => [value, 'mapped utilities']} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid rgba(180, 35, 24, 0.10)', borderRadius: 16, color: '#171717' }} formatter={(value) => [value, 'связанных утилит']} />
               <Bar dataKey="utility_count" radius={[0, 14, 14, 0]}>
                 {techniqueCoverageSeries.map((entry) => (
                   <Cell key={entry.full_name} fill={entry.fill} />
@@ -1095,8 +1267,8 @@ function App() {
         <article className="glass-panel chart-card chart-card-wide">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Signal quality</div>
-              <h3>Confidence distribution</h3>
+              <div className="section-kicker-modern">Качество сигнала</div>
+              <h3>Распределение уверенности</h3>
             </div>
             <Shield size={18} />
           </div>
@@ -1114,8 +1286,8 @@ function App() {
         <article className="glass-panel chart-card chart-card-wide">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Coverage leaders</div>
-              <h3>Утилиты с наибольшим MITRE coverage</h3>
+              <div className="section-kicker-modern">Лидеры покрытия</div>
+              <h3>Утилиты с наибольшим MITRE-покрытием</h3>
             </div>
             <Sparkles size={18} />
           </div>
@@ -1124,7 +1296,7 @@ function App() {
               <CartesianGrid stroke="rgba(180, 35, 24, 0.08)" horizontal={false} />
               <XAxis type="number" stroke="rgba(23, 23, 23, 0.55)" />
               <YAxis dataKey="name" type="category" width={140} stroke="rgba(23, 23, 23, 0.75)" tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid rgba(180, 35, 24, 0.10)', borderRadius: 16, color: '#171717' }} formatter={(value, name) => [value, name === 'techniques' ? 'MITRE techniques' : name]} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid rgba(180, 35, 24, 0.10)', borderRadius: 16, color: '#171717' }} formatter={(value, name) => [value, name === 'techniques' ? 'техник MITRE' : name]} />
               <Bar dataKey="techniques" radius={[0, 14, 14, 0]}>
                 {topCoverageTools.map((entry) => (
                   <Cell key={entry.full_name} fill={entry.fill} />
@@ -1137,8 +1309,8 @@ function App() {
         <article className="glass-panel chart-card">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Refinement techniques</div>
-              <h3>Какие candidate techniques чаще всплывают как gaps</h3>
+              <div className="section-kicker-modern">Кандидаты уточнения</div>
+              <h3>Какие техники чаще всплывают как новые кандидаты</h3>
             </div>
             <Sparkles size={18} />
           </div>
@@ -1147,7 +1319,7 @@ function App() {
               <CartesianGrid stroke="rgba(180, 35, 24, 0.08)" horizontal={false} />
               <XAxis type="number" stroke="rgba(23, 23, 23, 0.55)" />
               <YAxis dataKey="name" type="category" width={180} stroke="rgba(23, 23, 23, 0.75)" tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid rgba(180, 35, 24, 0.10)', borderRadius: 16, color: '#171717' }} formatter={(value) => [value, 'tools needing review']} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid rgba(180, 35, 24, 0.10)', borderRadius: 16, color: '#171717' }} formatter={(value) => [value, 'инструментов на проверку']} />
               <Bar dataKey="tool_count" radius={[0, 14, 14, 0]}>
                 {refinementTechniqueSeries.map((entry) => (
                   <Cell key={entry.full_name} fill={entry.fill} />
@@ -1160,8 +1332,8 @@ function App() {
         <article className="glass-panel chart-card">
           <div className="section-heading">
             <div>
-              <div className="section-kicker-modern">Review queue</div>
-              <h3>Инструменты с самым большим числом новых candidate links</h3>
+              <div className="section-kicker-modern">Очередь проверки</div>
+              <h3>Инструменты с самым большим числом новых кандидатов</h3>
             </div>
             <Layers3 size={18} />
           </div>
@@ -1170,7 +1342,7 @@ function App() {
               <CartesianGrid stroke="rgba(180, 35, 24, 0.08)" horizontal={false} />
               <XAxis type="number" stroke="rgba(23, 23, 23, 0.55)" />
               <YAxis dataKey="name" type="category" width={160} stroke="rgba(23, 23, 23, 0.75)" tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid rgba(180, 35, 24, 0.10)', borderRadius: 16, color: '#171717' }} formatter={(value) => [value, 'unmapped technique suggestions']} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid rgba(180, 35, 24, 0.10)', borderRadius: 16, color: '#171717' }} formatter={(value) => [value, 'новых кандидатов техник']} />
               <Bar dataKey="gap_count" radius={[0, 14, 14, 0]}>
                 {refinementToolSeries.map((entry) => (
                   <Cell key={entry.full_name} fill={entry.fill} />
@@ -1184,26 +1356,26 @@ function App() {
         <article className="glass-panel refinement-panel">
           <div className="section-heading coverage-matrix-heading">
             <div>
-              <div className="section-kicker-modern">High-signal candidates</div>
-              <h3>Приоритетный список новых MITRE suggestions</h3>
+              <div className="section-kicker-modern">Сильные кандидаты</div>
+              <h3>Приоритетный список новых MITRE-связей</h3>
             </div>
             <p>
-              Здесь собраны верхние unmapped suggestions по retrieval score. Это удобная short-list для ручной проверки
-              перед тем, как расширять финальный MITRE matrix-layer.
+              Здесь собраны верхние неподтверждённые связи по оценке поиска. Это короткий список для ручной проверки
+              перед расширением финальной MITRE-матрицы.
             </p>
           </div>
           <div className="refinement-highlight-grid">
             {refinementHighlights.map((row) => (
               <article key={`${row.record_id}-${row.technique_id}-${row.retrieval_rank}`} className="refinement-highlight-card">
                 <div className="refinement-card-topline">
-                  <span className="refinement-status-pill">Needs review</span>
-                  <span>{formatScore(row.retrieval_score)} score</span>
+                  <span className="refinement-status-pill">На проверку</span>
+                  <span>{formatScore(row.retrieval_score)} оценка</span>
                 </div>
                 <h4>{row.technique_id} · {row.technique_name}</h4>
                 <p>{row.tool_name}</p>
                 <div className="refinement-meta-row">
                   <span>{row.source}</span>
-                  <span>rank #{row.retrieval_rank}</span>
+                  <span>очередь #{row.retrieval_rank}</span>
                 </div>
                 <div className="tag-ribbon compact-tags refinement-tag-ribbon">
                   {row.tactics.slice(0, 4).map((tactic) => (
@@ -1223,16 +1395,16 @@ function App() {
         <article className="glass-panel coverage-matrix-panel">
           <div className="section-heading coverage-matrix-heading">
             <div>
-              <div className="section-kicker-modern">Matrix snapshot</div>
-              <h3>Top tools x top tactics</h3>
+              <div className="section-kicker-modern">Снимок матрицы</div>
+              <h3>Лучшие инструменты и главные тактики</h3>
             </div>
             <p>
-              Компактный view по тому, какие из верхних утилит реально закрывают основные tactic-зоны в текущем dataset.
+              Компактный вид того, какие из верхних утилит реально закрывают основные зоны тактик в текущем наборе данных.
             </p>
           </div>
           <div className="coverage-matrix-grid">
             <div className="coverage-matrix-row coverage-matrix-header">
-              <div className="coverage-matrix-tool-cell">Tool</div>
+              <div className="coverage-matrix-tool-cell">Инструмент</div>
               {toolTacticMatrix.tactics.map((tactic) => (
                 <div key={tactic} className="coverage-matrix-tactic-cell">{tactic}</div>
               ))}
@@ -1256,11 +1428,11 @@ function App() {
         <article className="glass-panel mitre-heatmap-panel">
           <div className="section-heading mitre-heatmap-heading">
             <div>
-              <div className="section-kicker-modern">MITRE heatmap preview</div>
-              <h3>Компактный preview полной tactic x technique матрицы</h3>
+              <div className="section-kicker-modern">Тепловая карта MITRE</div>
+              <h3>Компактный вид полной матрицы тактик и техник</h3>
             </div>
             <p>
-              На странице оставлен сокращённый preview, чтобы Analytics не расползалась по высоте и ширине.
+              На странице оставлен сокращённый вид, чтобы аналитика не расползалась по высоте и ширине.
               Полную матрицу можно открыть отдельной кнопкой в полноэкранном режиме.
             </p>
           </div>
@@ -1273,9 +1445,9 @@ function App() {
           </div>
 
           <div className="heatmap-preview-meta">
-            <span>Показаны top {Math.min(8, mitreHeatmap.tactics.length)} tactics</span>
-            <span>Показаны top {Math.min(10, mitreHeatmap.rows.length)} techniques</span>
-            <span>Total matrix: {mitreHeatmap.rows.length} x {mitreHeatmap.tactics.length}</span>
+            <span>Показано тактик: {Math.min(8, mitreHeatmap.tactics.length)}</span>
+            <span>Показано техник: {Math.min(10, mitreHeatmap.rows.length)}</span>
+            <span>Вся матрица: {mitreHeatmap.rows.length} x {mitreHeatmap.tactics.length}</span>
           </div>
 
           <MitreHeatmapMatrix heatmap={mitreHeatmap} tacticLimit={8} rowLimit={10} />
@@ -1285,11 +1457,11 @@ function App() {
 
       {isHeatmapOpen && (
         <div className="heatmap-modal-backdrop" role="presentation" onClick={() => setIsHeatmapOpen(false)}>
-          <section className="heatmap-modal glass-panel" role="dialog" aria-modal="true" aria-label="Full MITRE heatmap" onClick={(event) => event.stopPropagation()}>
+          <section className="heatmap-modal glass-panel" role="dialog" aria-modal="true" aria-label="Полная тепловая карта MITRE" onClick={(event) => event.stopPropagation()}>
             <div className="section-heading mitre-heatmap-heading heatmap-modal-heading">
               <div>
-                <div className="section-kicker-modern">Full MITRE heatmap</div>
-                <h3>Все tactics и techniques с интенсивностью по числу mapped utilities</h3>
+                <div className="section-kicker-modern">Полная тепловая карта MITRE</div>
+                <h3>Все тактики и техники с интенсивностью по числу связанных утилит</h3>
               </div>
               <button type="button" className="heatmap-close-button" onClick={() => setIsHeatmapOpen(false)}>
                 Закрыть <X size={16} />
@@ -1297,8 +1469,8 @@ function App() {
             </div>
 
             <p className="heatmap-modal-copy">
-              Чем краснее ячейка, тем больше уникальных утилит относятся к конкретной паре tactic и technique.
-              Это полный coverage-view без сокращений.
+              Чем краснее ячейка, тем больше уникальных утилит относятся к конкретной паре тактики и техники.
+              Это полный вид покрытия без сокращений.
             </p>
 
             <HeatmapLegend />
@@ -1311,33 +1483,33 @@ function App() {
       <section className="explorer-shell" id="tool-explorer">
         <div className="section-heading heading-light explorer-heading">
           <div>
-            <div className="section-kicker-modern">Explorer</div>
-            <h3>Полноценный browser поверх tool intelligence layer</h3>
+            <div className="section-kicker-modern">Инструменты</div>
+            <h3>Полноценный браузер по слою разведданных</h3>
           </div>
           <p>
             Здесь уже можно работать как в отдельном продукте: быстро фильтровать, искать и читать полный профиль
-            инструмента без ограничений старого layout.
+            инструмента без ограничений старой раскладки.
           </p>
         </div>
 
         <div className="explorer-controls glass-panel">
           <label className="control-block search-block">
-            <span><Search size={14} /> Search</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="tool name, tags, description..." />
+            <span><Search size={14} /> Поиск</span>
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="название, теги, описание..." />
           </label>
           <label className="control-block">
-            <span>Source</span>
+            <span>Источник</span>
             <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
               {sourceOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
+                <option key={option} value={option}>{option === 'All' ? 'Все' : option}</option>
               ))}
             </select>
           </label>
           <label className="control-block">
-            <span>MITRE tactic</span>
+            <span>Тактика MITRE</span>
             <select value={tacticFilter} onChange={(event) => setTacticFilter(event.target.value)}>
               {tacticOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
+                <option key={option} value={option}>{option === 'All' ? 'Все' : option}</option>
               ))}
             </select>
           </label>
@@ -1347,10 +1519,10 @@ function App() {
           <section className="utility-list-panel glass-panel">
             <div className="panel-heading-row">
               <div>
-                <div className="section-kicker-modern">Utility list</div>
-                <h3>{filteredTools.length} visible tools</h3>
+                <div className="section-kicker-modern">Список утилит</div>
+                <h3>Показано: {filteredTools.length}</h3>
               </div>
-              <span className="panel-chip">Ranked explorer</span>
+              <span className="panel-chip">По рангу</span>
             </div>
             <div className="utility-list-scroll">
               {filteredTools.map((tool) => {
@@ -1371,7 +1543,7 @@ function App() {
                     <div className="utility-list-footer">
                       <span>{tool.entity_type}</span>
                       <span>{tool.mitre_technique_count || 0} MITRE</span>
-                      <span>{formatScore(tool.confidence_score)} confidence</span>
+                      <span>{formatScore(tool.confidence_score)} уверенность</span>
                     </div>
                   </button>
                 )
@@ -1384,59 +1556,149 @@ function App() {
               <>
                 <div className="panel-heading-row">
                   <div>
-                    <div className="section-kicker-modern">Tool details</div>
+                    <div className="section-kicker-modern">Профиль инструмента</div>
                     <h3>{selectedTool.assessed_name}</h3>
                   </div>
                   <a className="detail-link" href={selectedTool.url} target="_blank" rel="noreferrer">
-                    Open source page <ExternalLink size={14} />
+                    Открыть источник <ExternalLink size={14} />
                   </a>
                 </div>
 
                 <div className="detail-stat-grid-modern">
                   <div>
-                    <span>Rank</span>
+                    <span>Ранг</span>
                     <strong>{rankLabel(selectedTool.visualization_rank)}</strong>
                   </div>
                   <div>
-                    <span>Confidence</span>
+                    <span>Уверенность</span>
                     <strong>{formatScore(selectedTool.confidence_score)}</strong>
                   </div>
                   <div>
-                    <span>Source</span>
+                    <span>Источник</span>
                     <strong>{selectedTool.source}</strong>
                   </div>
                   <div>
-                    <span>Entity</span>
+                    <span>Тип</span>
                     <strong>{selectedTool.entity_type}</strong>
                   </div>
                 </div>
 
                 <div className="detail-copy-grid">
                   <article>
-                    <div className="detail-section-kicker">Short description</div>
+                    <div className="detail-section-kicker">Краткое описание</div>
                     <p>{selectedTool.short_description_ru}</p>
                   </article>
                   <article>
-                    <div className="detail-section-kicker">Category</div>
-                    <p>{selectedTool.category_ru}</p>
-                    <div className="tag-ribbon compact-tags">
-                      {normaliseArray(selectedTool.filter_tags).slice(0, 12).map((tag) => (
-                        <span key={tag}>{tag}</span>
-                      ))}
+                    <div className="detail-section-kicker">Контекст записи</div>
+                    <div className="tool-context-grid">
+                      <span><strong>source</strong>{formatMetaValue(selectedTool.source)}</span>
+                      <span><strong>type</strong>{formatMetaValue(selectedTool.entity_type)}</span>
+                      <span><strong>category</strong>{formatMetaValue(selectedTool.category_ru)}</span>
+                      <span><strong>MITRE</strong>{selectedMatrix.length} связей</span>
                     </div>
+                    {selectedDisplayTags.length > 0 && (
+                      <div className="tag-ribbon compact-tags readable-tags">
+                        {selectedDisplayTags.slice(0, 10).map((tag) => (
+                          <span key={tag}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
                   </article>
                 </div>
 
                 <article className="detail-longform">
-                  <div className="detail-section-kicker">Long description</div>
+                  <div className="detail-section-kicker">Полное описание</div>
                   <p>{selectedTool.long_description_ru}</p>
                 </article>
 
-                <section className="matrix-section-modern refinement-section-modern">
+                <section className="matrix-section-modern ttp-map-section">
                   <div className="panel-heading-row minor-heading">
                     <div>
-                      <div className="detail-section-kicker">MITRE refinement</div>
-                      <h4>{selectedRefinement.length} candidate mappings</h4>
+                      <div className="detail-section-kicker">MITRE-связи инструмента</div>
+                      <h4>Карта связей: инструмент {'->'} тактики {'->'} техники</h4>
+                    </div>
+                    <span className="panel-chip">{selectedTtpGroups.length} тактик · {selectedMatrix.length} техник</span>
+                  </div>
+                  {selectedTtpGroups.length ? (
+                    <div className="ttp-map-layout">
+                      <div className="ttp-overview-band">
+                        <div className="ttp-tool-node">
+                          <span>Инструмент</span>
+                          <strong>{selectedTool.assessed_name}</strong>
+                          <em>{formatMetaValue(selectedTool.category_ru)}</em>
+                        </div>
+                        <ArrowRight size={24} />
+                        <div className="ttp-overview-stat">
+                          <strong>{selectedTtpGroups.length}</strong>
+                          <span>тактик</span>
+                        </div>
+                        <ArrowRight size={24} />
+                        <div className="ttp-overview-stat">
+                          <strong>{selectedMatrix.length}</strong>
+                          <span>техник</span>
+                        </div>
+                      </div>
+
+                      <div className="ttp-tactic-stack">
+                        {selectedTtpGroups.map((group, groupIndex) => (
+                          <article key={group.tactic} className="ttp-tactic-block">
+                            <div className="ttp-tactic-node" style={{ '--tactic-accent': accentPalette[groupIndex % accentPalette.length] }}>
+                              <div className="ttp-tactic-number">{String(groupIndex + 1).padStart(2, '0')}</div>
+                              <div>
+                                <span>Тактика MITRE</span>
+                                <h5>{group.tactic}</h5>
+                                <p>{group.description}</p>
+                              </div>
+                              <div className="ttp-tactic-metrics">
+                                <strong>{group.techniques.length}</strong>
+                                <span>техник</span>
+                                <em>средняя уверенность {formatScore(group.avgConfidence)}</em>
+                              </div>
+                            </div>
+
+                            <div className="ttp-flow-divider">
+                              <span>Техники внутри тактики</span>
+                            </div>
+
+                            <div className="ttp-technique-grid">
+                              {group.techniques.map((row, index) => (
+                                <div key={`${row.technique_id}-${group.tactic}-${index}`} className="ttp-technique-card">
+                                  <div className="ttp-technique-topline">
+                                    <div className="ttp-technique-id">{row.technique_id}</div>
+                                    <span>Уверенность {formatScore(row.confidence)}</span>
+                                  </div>
+                                  <h5>{row.technique_name}</h5>
+                                  <div className="ttp-technique-explain">
+                                    <strong>Что делает</strong>
+                                    <p>{row.technique_description}</p>
+                                  </div>
+                                  {row.reasoning_ru && (
+                                    <div className="ttp-technique-explain is-reason">
+                                      <strong>Почему связали</strong>
+                                      <p>{row.reasoning_ru}</p>
+                                    </div>
+                                  )}
+                                  <div className="ttp-technique-meta">
+                                    <span>source:{formatMetaValue(row.source)}</span>
+                                    <span>{formatMetaValue(row.category_ru)}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="empty-detail mitre-empty">Для этого инструмента MITRE-связи пока не рассчитаны.</div>
+                  )}
+                </section>
+
+                <section className="matrix-section-modern refinement-section-modern compact-review-section">
+                  <div className="panel-heading-row minor-heading">
+                    <div>
+                      <div className="detail-section-kicker">Уточнение MITRE</div>
+                      <h4>{selectedRefinement.length} кандидатов на проверку</h4>
                     </div>
                   </div>
                   {selectedRefinement.length ? (
@@ -1445,14 +1707,14 @@ function App() {
                         <article key={`${row.record_id}-${row.technique_id}-${row.retrieval_rank}`} className="refinement-highlight-card refinement-highlight-card-detail">
                           <div className="refinement-card-topline">
                             <span className={`refinement-status-pill ${row.already_mapped ? 'is-mapped' : ''}`}>
-                              {row.already_mapped ? 'Already mapped' : 'Needs review'}
+                              {row.already_mapped ? 'Уже в матрице' : 'На проверку'}
                             </span>
-                            <span>{formatScore(row.retrieval_score)} score</span>
+                            <span>{formatScore(row.retrieval_score)} оценка</span>
                           </div>
                           <h4>{row.technique_id} · {row.technique_name}</h4>
                           <div className="refinement-meta-row">
-                            <span>rank #{row.retrieval_rank}</span>
-                            <span>{row.mapped_confidence ? `${formatScore(row.mapped_confidence)} mapped confidence` : 'new candidate'}</span>
+                            <span>очередь #{row.retrieval_rank}</span>
+                            <span>{row.mapped_confidence ? `${formatScore(row.mapped_confidence)} в матрице` : 'новый кандидат'}</span>
                           </div>
                           <div className="tag-ribbon compact-tags refinement-tag-ribbon">
                             {splitTactics(row.tactic_names).slice(0, 4).map((tactic) => (
@@ -1468,23 +1730,23 @@ function App() {
                       ))}
                     </div>
                   ) : (
-                    <div className="empty-detail refinement-empty">Для этой утилиты refinement-layer пока не нашёл дополнительных кандидатов.</div>
+                    <div className="empty-detail refinement-empty">Для этой утилиты слой уточнения пока не нашёл дополнительных кандидатов.</div>
                   )}
                 </section>
 
                 <section className="matrix-section-modern">
                   <div className="panel-heading-row minor-heading">
                     <div>
-                      <div className="detail-section-kicker">Selected tool MITRE</div>
-                      <h4>{selectedMatrix.length} relevant mappings</h4>
+                      <div className="detail-section-kicker">Техническая таблица MITRE</div>
+                      <h4>{selectedMatrix.length} подтверждённых связей</h4>
                     </div>
                   </div>
                   <div className="matrix-table-modern">
                     <div className="matrix-table-head">
-                      <span>Technique</span>
-                      <span>Name</span>
-                      <span>Tactic</span>
-                      <span>Confidence</span>
+                      <span>Техника</span>
+                      <span>Название</span>
+                      <span>Тактика</span>
+                      <span>Уверенность</span>
                     </div>
                     <div className="matrix-table-body">
                       {selectedMatrix.map((row, index) => (

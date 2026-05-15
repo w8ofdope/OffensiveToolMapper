@@ -141,3 +141,17 @@ test_that("tool and technique MCP helpers expose linked MITRE data", {
   expect_equal(stats$technique_count, 2)
   expect_true("source_breakdown" %in% names(stats))
 })
+
+test_that("MCP helpers tolerate an empty fresh-clone data directory", {
+  data_dir <- tempfile(pattern = "mcp-empty-data-")
+  dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+
+  result <- search_tools(data_dir = data_dir)
+  expect_equal(nrow(result), 0)
+
+  stats <- get_statistics(data_dir = data_dir)
+  expect_equal(stats$tool_count, 0)
+  expect_equal(stats$mapping_count, 0)
+  expect_equal(nrow(stats$source_breakdown), 0)
+  expect_equal(names(stats$source_breakdown), c("source", "count"))
+})

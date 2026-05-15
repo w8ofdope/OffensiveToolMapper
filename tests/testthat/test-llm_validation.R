@@ -79,6 +79,7 @@ test_that("run_validation_enrichment saves enriched tools and skips prefiltered 
     normalized_data = normalized,
     output_path = output_path,
     enriched_output_path = enriched_path,
+    provider = "deepseek",
     api_key = "test-key"
   )
 
@@ -152,32 +153,57 @@ test_that("run_validation_enrichment processes candidates in descending score or
     normalized_data = normalized,
     output_path = tempfile(fileext = ".rds"),
     enriched_output_path = tempfile(fileext = ".rds"),
+    provider = "deepseek",
     api_key = "test-key"
   )
 
   expect_equal(tracker$seen_names, c("hightool", "lowtool"))
 })
 
-test_that("get_llm_runtime_config reports non-secret DeepSeek runtime settings", {
+test_that("get_llm_runtime_config reports non-secret OpenAI runtime settings", {
   original_provider <- Sys.getenv("LLM_PROVIDER", unset = NA_character_)
   original_model <- Sys.getenv("LLM_MODEL", unset = NA_character_)
   original_base_url <- Sys.getenv("LLM_BASE_URL", unset = NA_character_)
-  original_key <- Sys.getenv("DEEPSEEK_API_KEY", unset = NA_character_)
+  original_key <- Sys.getenv("OPENAI_API_KEY", unset = NA_character_)
+  original_dotenv_path <- getOption("offensivetoolmapper.dotenv_path", NULL)
 
   Sys.unsetenv(c("LLM_PROVIDER", "LLM_MODEL", "LLM_BASE_URL"))
-  Sys.setenv(DEEPSEEK_API_KEY = "masked-test-key")
+  Sys.setenv(OPENAI_API_KEY = "masked-test-key")
+  options(offensivetoolmapper.dotenv_path = tempfile())
 
   on.exit({
+    if (is.null(original_dotenv_path)) options(offensivetoolmapper.dotenv_path = NULL) else options(offensivetoolmapper.dotenv_path = original_dotenv_path)
     if (is.na(original_provider)) Sys.unsetenv("LLM_PROVIDER") else Sys.setenv(LLM_PROVIDER = original_provider)
     if (is.na(original_model)) Sys.unsetenv("LLM_MODEL") else Sys.setenv(LLM_MODEL = original_model)
     if (is.na(original_base_url)) Sys.unsetenv("LLM_BASE_URL") else Sys.setenv(LLM_BASE_URL = original_base_url)
-    if (is.na(original_key)) Sys.unsetenv("DEEPSEEK_API_KEY") else Sys.setenv(DEEPSEEK_API_KEY = original_key)
+    if (is.na(original_key)) Sys.unsetenv("OPENAI_API_KEY") else Sys.setenv(OPENAI_API_KEY = original_key)
   }, add = TRUE)
 
   config <- get_llm_runtime_config()
 
-  expect_equal(config$provider[[1]], "deepseek")
-  expect_equal(config$model[[1]], "deepseek-chat")
-  expect_equal(config$base_url[[1]], "https://api.deepseek.com")
+  expect_equal(config$provider[[1]], "openai")
+  expect_equal(config$model[[1]], "gpt-4.1-mini")
+  expect_equal(config$base_url[[1]], "https://api.openai.com/v1")
   expect_true(config$api_key_present[[1]])
+})
+
+test_that("dotenv fallback can switch the LLM provider", {
+  dotenv_path <- tempfile(fileext = ".env")
+  writeLines(c("LLM_PROVIDER=deepseek", "DEEPSEEK_API_KEY=masked-test-key"), dotenv_path, useBytes = TRUE)
+
+  original_dotenv_path <- getOption("offensivetoolmapper.dotenv_path", NULL)
+  original_provider <- Sys.getenv("LLM_PROVIDER", unset = NA_character_)
+  original_key <- Sys.getenv("DEEPSEEK_API_KEY", unset = NA_character_)
+
+  Sys.unsetenv(c("LLM_PROVIDER", "DEEPSEEK_API_KEY"))
+  options(offensivetoolmapper.dotenv_path = dotenv_path)
+
+  on.exit({
+    if (is.null(original_dotenv_path)) options(offensivetoolmapper.dotenv_path = NULL) else options(offensivetoolmapper.dotenv_path = original_dotenv_path)
+    if (is.na(original_provider)) Sys.unsetenv("LLM_PROVIDER") else Sys.setenv(LLM_PROVIDER = original_provider)
+    if (is.na(original_key)) Sys.unsetenv("DEEPSEEK_API_KEY") else Sys.setenv(DEEPSEEK_API_KEY = original_key)
+  }, add = TRUE)
+
+  expect_equal(get_default_llm_provider(), "deepseek")
+  expect_equal(get_llm_api_key("deepseek"), "masked-test-key")
 })

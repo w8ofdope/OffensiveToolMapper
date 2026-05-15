@@ -510,6 +510,19 @@
   value
 }
 
+.normalize_row_value <- function(row, column, default = NA) {
+  if (!is.data.frame(row) || !(column %in% names(row))) {
+    return(default)
+  }
+
+  value <- row[[column]]
+  if (length(value) == 0) {
+    return(default)
+  }
+
+  value
+}
+
 .normalize_string <- function(value) {
   if (is.null(value) || length(value) == 0) {
     return(NA_character_)
@@ -956,10 +969,10 @@
         category = .normalize_string(row$category),
         guid = .normalize_string(row$guid),
         feed_url = .normalize_string(row$feed_url),
-        credit = .normalize_string(row$credit),
-        credit_url = .normalize_string(row$credit_url),
-        api_query = .normalize_string(row$api_query),
-        tag_names = .normalize_value_or(row$tag_names, character(0))
+        credit = .normalize_string(.normalize_row_value(row, "credit")),
+        credit_url = .normalize_string(.normalize_row_value(row, "credit_url")),
+        api_query = .normalize_string(.normalize_row_value(row, "api_query")),
+        tag_names = .normalize_value_or(.normalize_row_value(row, "tag_names", NULL), character(0))
       )
       metadata$canonical_url <- .normalize_canonicalize_url(url)
       metadata$canonical_name <- .normalize_canonicalize_name(name)

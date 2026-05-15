@@ -14,7 +14,7 @@ test_that("get_default_github_queries returns curated defaults", {
   expect_true(any(grepl('"metasploit"', queries, fixed = TRUE)))
   expect_true(any(grepl("topic:red-team", queries, fixed = TRUE)))
   expect_true("red-team" %in% topics)
-  expect_setequal(sort_modes, c("stars", "updated"))
+  expect_setequal(sort_modes, c("best-match", "stars", "updated"))
 })
 
 test_that("fetch_repo_details returns normalized repository metadata", {

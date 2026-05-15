@@ -140,7 +140,7 @@ safe_json_request <- function(
 #' @param path Path to the dotenv file.
 #'
 #' @return Character scalar, or empty string when not found.
-read_dotenv_value <- function(name, path = ".env") {
+read_dotenv_value <- function(name, path = getOption("offensivetoolmapper.dotenv_path", ".env")) {
   if (!file.exists(path)) {
     return("")
   }
@@ -178,8 +178,8 @@ read_dotenv_value <- function(name, path = ".env") {
 #'
 #' @return Character scalar.
 get_runtime_env_value <- function(name, unset = "") {
-  value <- Sys.getenv(name, unset = unset)
-  if (nzchar(value)) {
+  value <- Sys.getenv(name, unset = NA_character_)
+  if (!is.na(value) && nzchar(value)) {
     return(value)
   }
 

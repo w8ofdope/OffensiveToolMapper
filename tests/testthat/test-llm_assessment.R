@@ -63,14 +63,22 @@ test_that("parse_unified_tool_assessment_json accepts DeepSeek-style aliases", {
   expect_equal(result$mitre_classifications$confidence[[1]], 0.75)
 })
 
-test_that("DeepSeek is the default LLM provider configuration", {
+test_that("OpenAI is the default LLM provider configuration", {
   original_provider <- Sys.getenv("LLM_PROVIDER", unset = NA_character_)
   original_model <- Sys.getenv("LLM_MODEL", unset = NA_character_)
   original_base_url <- Sys.getenv("LLM_BASE_URL", unset = NA_character_)
+  original_dotenv_path <- getOption("offensivetoolmapper.dotenv_path", NULL)
 
   Sys.unsetenv(c("LLM_PROVIDER", "LLM_MODEL", "LLM_BASE_URL"))
+  options(offensivetoolmapper.dotenv_path = tempfile())
 
   on.exit({
+    if (is.null(original_dotenv_path)) {
+      options(offensivetoolmapper.dotenv_path = NULL)
+    } else {
+      options(offensivetoolmapper.dotenv_path = original_dotenv_path)
+    }
+
     if (is.na(original_provider)) {
       Sys.unsetenv("LLM_PROVIDER")
     } else {
@@ -90,9 +98,14 @@ test_that("DeepSeek is the default LLM provider configuration", {
     }
   }, add = TRUE)
 
-  expect_equal(get_default_llm_provider(), "deepseek")
-  expect_equal(get_default_llm_model(), "deepseek-chat")
-  expect_equal(get_default_llm_base_url(), "https://api.deepseek.com")
+  expect_equal(get_default_llm_provider(), "openai")
+  expect_equal(get_default_llm_model(), "gpt-4.1-mini")
+  expect_equal(get_default_llm_base_url(), "https://api.openai.com/v1")
+})
+
+test_that("DeepSeek can still be selected explicitly", {
+  expect_equal(get_default_llm_model("deepseek"), "deepseek-chat")
+  expect_equal(get_default_llm_base_url("deepseek"), "https://api.deepseek.com")
 })
 
 test_that("run_unified_tool_assessment saves assessment, relevant tools, and MITRE rows", {
@@ -171,6 +184,7 @@ test_that("run_unified_tool_assessment saves assessment, relevant tools, and MIT
     mitre_output_path = mitre_path,
     duckdb_path = duckdb_path,
     write_duckdb = TRUE,
+    provider = "deepseek",
     api_key = "test-key"
   )
 
@@ -279,6 +293,7 @@ test_that("run_unified_tool_assessment drops documentation-like repos even if LL
     mitre_output_path = tempfile(fileext = ".rds"),
     duckdb_path = tempfile(fileext = ".duckdb"),
     write_duckdb = FALSE,
+    provider = "deepseek",
     api_key = "test-key"
   )
 

@@ -1,9 +1,8 @@
-test_that("get_default_feeds returns named feed URLs", {
+test_that("get_default_feeds is empty unless feeds are configured", {
   feeds <- get_default_feeds()
 
   expect_type(feeds, "character")
-  expect_true(length(feeds) >= 2)
-  expect_false(is.null(names(feeds)))
+  expect_equal(length(feeds), 0)
 })
 
 test_that("fetch_security_feeds parses RSS feeds", {
