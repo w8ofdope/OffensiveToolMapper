@@ -60,7 +60,7 @@ docker compose up --build
 
 Скрипт спросит:
 
-- `LLM provider`: `openai` или `deepseek`;
+- `LLM provider`: только `openai` или `deepseek`, не API-ключ;
 - `LLM model`;
 - ключ выбранного LLM-провайдера;
 - `GITHUB_PAT`;

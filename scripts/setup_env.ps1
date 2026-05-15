@@ -1,5 +1,4 @@
 param(
-  [ValidateSet("", "openai", "deepseek")]
   [string]$Provider = "",
   [string]$Model = "",
   [string]$OpenAiApiKey = "",
@@ -56,6 +55,17 @@ function Read-SecretValue {
   }
 }
 
+function Test-LooksLikeApiKey {
+  param([string]$Value)
+
+  if (-not $Value) {
+    return $false
+  }
+
+  $trimmed = $Value.Trim().Trim('"').Trim("'")
+  return $trimmed -match '^(sk-|sk_|github_pat_|ghp_)'
+}
+
 function Get-DefaultModel {
   param([string]$ProviderName)
 
@@ -93,13 +103,17 @@ if (-not $Provider) {
   if ($NonInteractive) {
     $Provider = "openai"
   } else {
-    $Provider = Read-PlainValue "LLM provider: openai or deepseek" "openai"
+    $Provider = Read-PlainValue "LLM_PROVIDER (type provider name only: openai or deepseek)" "openai"
   }
 }
 
-$Provider = $Provider.ToLowerInvariant()
+$Provider = $Provider.Trim().Trim('"').Trim("'").ToLowerInvariant()
+if (Test-LooksLikeApiKey $Provider) {
+  throw "You pasted an API key into LLM_PROVIDER. Enter only 'openai' or 'deepseek' here. The API key is requested on the next prompts: OPENAI_API_KEY or DEEPSEEK_API_KEY."
+}
+
 if ($Provider -notin @("openai", "deepseek")) {
-  throw "LLM provider must be openai or deepseek."
+  throw "LLM_PROVIDER must be 'openai' or 'deepseek'."
 }
 
 if (-not $Model) {
