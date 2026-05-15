@@ -1,6 +1,6 @@
 # OffensiveToolMapper
 
-Инструкция по настройке и запуску проекта после клонирования репозитория.
+Система мониторинга и классификации наступательных инструментов безопасности. Автоматически собирает инструменты с GitHub, оценивает их нейросетью и строит MITRE ATT&CK-маппинги.
 
 ## Что запускается
 
@@ -8,10 +8,10 @@
 
 | Сервис | URL | Назначение |
 | --- | --- | --- |
-| Shiny-приложение | `http://localhost:8788` | основной интерфейс: обзор, аналитика, инструменты, MITRE-связи и pipeline |
-| MCP-сервер | `http://localhost:3000` | HTTP MCP-сервер поверх готовых данных проекта |
+| Shiny-приложение | `http://localhost:8788` | основной интерфейс: обзор, аналитика, инструменты, MITRE-связи и пайплайн |
+| MCP-сервер | `http://localhost:3000` | HTTP MCP-сервер для подключения к нейросетевым агентам |
 
-Первый запуск возможен без собранных данных: интерфейсы откроются, но список инструментов может быть пустым. Реальные записи появляются после запуска pipeline.
+Первый запуск возможен без собранных данных: интерфейсы откроются, но список инструментов будет пустым. Реальные записи появляются после запуска пайплайна.
 
 ## Требования
 
@@ -60,12 +60,12 @@ docker compose up --build
 
 Скрипт спросит:
 
-- `LLM provider`: только `openai` или `deepseek`, не API-ключ;
-- `LLM model`: можно оставить значение по умолчанию;
-- ключ выбранного LLM-провайдера: ввод скрытый, символы не отображаются;
+- `LLM_PROVIDER`: имя провайдера (openai, anthropic, deepseek, xai, groq, mistral, ollama);
+- `LLM_MODEL`: можно оставить значение по умолчанию;
+- API-ключ выбранного провайдера: ввод скрытый, символы не отображаются;
+- дополнительные ключи других провайдеров (необязательно);
 - `GITHUB_PAT`: желательно указать, чтобы не упираться в низкие GitHub-лимиты;
-- необязательные OpenAI/project/base URL настройки: обычно можно оставить пустыми;
-- лимиты запусков: для теста можно поставить `LLM_MAX_RECORDS=20`, а `OTM_GITHUB_MAX_SEARCH_REQUESTS` оставить `60`.
+- лимиты запусков: для теста можно поставить `LLM_MAX_RECORDS=20`.
 
 Если нужные переменные уже установлены в системе, скрипт подхватит их и предложит оставить текущие значения через Enter.
 
@@ -82,30 +82,53 @@ Linux/macOS:
 cp .env.example .env
 ```
 
+## Поддерживаемые нейросети
+
+Проект поддерживает 7 провайдеров через единый OpenAI-совместимый интерфейс:
+
+| Провайдер | `LLM_PROVIDER` | Модель по умолчанию | Переменная ключа |
+| --- | --- | --- | --- |
+| OpenAI (ChatGPT) | `openai` | `gpt-4.1-mini` | `OPENAI_API_KEY` |
+| Anthropic (Claude) | `anthropic` | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
+| DeepSeek | `deepseek` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
+| xAI (Grok) | `xai` | `grok-3-mini` | `XAI_API_KEY` |
+| Groq | `groq` | `llama-3.3-70b-versatile` | `GROQ_API_KEY` |
+| Mistral AI | `mistral` | `mistral-small-latest` | `MISTRAL_API_KEY` |
+| Ollama (локальный) | `ollama` | `qwen3:8b` | не нужен |
+
+Пример для Claude:
+
+```env
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-sonnet-4-6
+ANTHROPIC_API_KEY=sk-ant-...
+GITHUB_PAT=github_pat_...
+```
+
+Пример для Grok:
+
+```env
+LLM_PROVIDER=xai
+LLM_MODEL=grok-3-mini
+XAI_API_KEY=xai-...
+GITHUB_PAT=github_pat_...
+```
+
+Пример для локального Ollama:
+
+```env
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen3:8b
+# LLM_BASE_URL=http://localhost:11434/v1  # по умолчанию
+GITHUB_PAT=github_pat_...
+```
+
 ## Обязательные ключи
 
-Для полноценного pipeline нужны:
+Для полноценного пайплайна нужны:
 
 - `GITHUB_PAT` — GitHub Personal Access Token;
-- один LLM-ключ: `OPENAI_API_KEY` или `DEEPSEEK_API_KEY`.
-
-OpenAI:
-
-```env
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-4.1-mini
-OPENAI_API_KEY=sk-...
-GITHUB_PAT=github_pat_...
-```
-
-DeepSeek:
-
-```env
-LLM_PROVIDER=deepseek
-LLM_MODEL=deepseek-chat
-DEEPSEEK_API_KEY=sk-...
-GITHUB_PAT=github_pat_...
-```
+- один API-ключ выбранного LLM-провайдера.
 
 Обычно можно оставить пустыми:
 
@@ -124,15 +147,19 @@ GITHUB_PAT=github_pat_...
 
 | Переменная | Когда нужна |
 | --- | --- |
-| `LLM_PROVIDER` | всегда: `openai` или `deepseek` |
-| `LLM_MODEL` | всегда: модель выбранного провайдера |
-| `OPENAI_API_KEY` | если `LLM_PROVIDER=openai` |
-| `DEEPSEEK_API_KEY` | если `LLM_PROVIDER=deepseek` |
-| `GITHUB_PAT` | для GitHub-сбора |
-| `OPENAI_ORG_ID` | только если требуется OpenAI-аккаунтом |
-| `OPENAI_PROJECT_ID` | только если требуется OpenAI-аккаунтом |
+| `LLM_PROVIDER` | всегда: имя провайдера |
+| `LLM_MODEL` | всегда: модель выбранного провайдера (пустое = по умолчанию) |
 | `LLM_BASE_URL` | только для кастомного OpenAI-compatible endpoint |
 | `LLM_MAX_RECORDS` | для ограничения LLM-запросов в тестовом запуске |
+| `OPENAI_API_KEY` | если `LLM_PROVIDER=openai` |
+| `ANTHROPIC_API_KEY` | если `LLM_PROVIDER=anthropic` |
+| `DEEPSEEK_API_KEY` | если `LLM_PROVIDER=deepseek` |
+| `XAI_API_KEY` | если `LLM_PROVIDER=xai` |
+| `GROQ_API_KEY` | если `LLM_PROVIDER=groq` |
+| `MISTRAL_API_KEY` | если `LLM_PROVIDER=mistral` |
+| `OPENAI_ORG_ID` | только если требуется OpenAI-организацией |
+| `OPENAI_PROJECT_ID` | только если требуется OpenAI-организацией |
+| `GITHUB_PAT` | для GitHub-сбора |
 | `OTM_COLLECT_MODE` | `incremental` или `snapshot` |
 | `OTM_GITHUB_MIN_STARS` | минимальное число stars для GitHub discovery |
 | `OTM_GITHUB_MAX_RESULTS` | лимит результатов GitHub discovery |
@@ -167,14 +194,124 @@ LLM_MAX_RECORDS=20
 OTM_GITHUB_MAX_SEARCH_REQUESTS=10
 ```
 
-Запуск pipeline внутри Docker:
+Запуск пайплайна внутри Docker:
 
 ```powershell
 docker compose run --rm shiny-app Rscript data-raw/run_full_pipeline.R
 docker compose up --build
 ```
 
-После pipeline в Shiny-приложении должны появиться карточки инструментов, тактики и техники MITRE.
+После пайплайна в Shiny-приложении должны появиться карточки инструментов, тактики и техники MITRE.
+
+## Этапы пайплайна
+
+Пайплайн состоит из пяти этапов, которые запускаются последовательно:
+
+1. **collect** — поиск новых инструментов на GitHub (по ключевым словам, stars, языку);
+2. **normalize** — дедупликация, извлечение метаданных, предварительная оценка по эвристикам;
+3. **assessment** — оценка каждого инструмента нейросетью: категория, тактики MITRE, уверенность;
+4. **refine_mitre** — уточнение MITRE-маппингов для записей с высокой уверенностью;
+5. **visualize** — построение слоя визуализации из DuckDB-данных в `.rds`-снапшоты для Shiny.
+
+Каждый запуск фиксируется в DuckDB с уникальным `run_id`. Это позволяет:
+
+- сравнивать запуски в Shiny (вкладка «Пайплайн» → «Сравнение запусков»);
+- отслеживать прирост новых инструментов между запусками;
+- видеть изменения в MITRE-маппингах со временем.
+
+**Одиночный запуск** (`run_full_pipeline.R`) проходит все 5 этапов один раз.
+
+**Пакетный запуск** (`run_full_pipeline_batch.R N`) повторяет полный цикл N раз подряд. Каждый цикл получает отдельный `run_id` и отдельную запись в `batch_summary`. Используется для постепенного накопления данных с GitHub (ротация поисковых запросов не позволяет собрать всё за один проход) или для проверки стабильности LLM-оценок.
+
+## MCP-сервер
+
+MCP (Model Context Protocol) — стандарт Anthropic для подключения инструментов к нейросетевым агентам. Проект реализует полноценный MCP-сервер с пятью инструментами:
+
+| Инструмент | Назначение |
+| --- | --- |
+| `search_tools` | поиск инструментов по ключевым словам |
+| `get_tool_ttps` | получение MITRE TTP-маппингов для конкретного инструмента |
+| `get_technique_tools` | поиск инструментов по технике MITRE (T-код) |
+| `get_statistics` | статистика базы: число инструментов, покрытие тактик |
+| `classify_new_tool` | классификация произвольного инструмента нейросетью |
+
+MCP-сервер поддерживает два транспорта:
+- **stdio** — для встраивания в Claude Desktop / Claude Code как локального MCP-сервера;
+- **HTTP** — для удалённого подключения (в Docker запускается на порту 3000).
+
+### Подключение к Claude Desktop (stdio)
+
+Добавь в конфиг Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "OffensiveToolMapper": {
+      "command": "Rscript",
+      "args": ["inst/mcp/run_server.R"],
+      "cwd": "/path/to/OffensiveToolMapper",
+      "env": {
+        "OTM_MCP_TRANSPORT": "stdio",
+        "OFFENSIVETOOLMAPPER_DATA_DIR": "/path/to/OffensiveToolMapper/inst/extdata"
+      }
+    }
+  }
+}
+```
+
+### Запуск MCP-сервера вручную
+
+```bash
+# stdio
+Rscript inst/mcp/run_server.R
+
+# HTTP (порт 3000)
+OTM_MCP_TRANSPORT=http OTM_MCP_PORT=3000 Rscript inst/mcp/run_server.R
+```
+
+## R-пакет
+
+Проект оформлен как полноценный R-пакет (`DESCRIPTION`, `NAMESPACE`, `R/`, `tests/`). Это позволяет:
+
+- устанавливать пакет через `devtools::install()` или `pak::pkg_install()`;
+- использовать функции пайплайна напрямую из R-сессии;
+- запускать тесты через `testthat`.
+
+### Установка пакета
+
+```r
+# из локальной директории
+devtools::install("/path/to/OffensiveToolMapper")
+
+# или через pak
+pak::pkg_install("local::/path/to/OffensiveToolMapper")
+```
+
+### Использование без Docker
+
+Если R установлен локально, все компоненты работают без Docker:
+
+```r
+library(OffensiveToolMapper)
+
+# Запуск Shiny-приложения
+shiny::runApp("inst/shiny/app.R")
+
+# Запуск MCP-сервера
+run_mcp_server(transport = "stdio")
+```
+
+Пайплайн запускается через Rscript:
+
+```bash
+Rscript data-raw/run_full_pipeline.R
+```
+
+Зависимости устанавливаются автоматически через `renv` (если он активен) или вручную:
+
+```r
+install.packages(c("shiny", "bslib", "dplyr", "duckdb", "httr2", "jsonlite", "DT"))
+```
 
 ## Проверка проекта
 
@@ -214,10 +351,11 @@ Invoke-WebRequest http://127.0.0.1:8788 -UseBasicParsing
 | Проблема | Решение |
 | --- | --- |
 | `failed to connect to docker API` | запустить Docker Desktop |
-| Shiny-приложение пустое | заполнить `.env` и запустить pipeline |
+| Shiny-приложение пустое | заполнить `.env` и запустить пайплайн |
 | LLM-этапы не работают | проверить `LLM_PROVIDER` и ключ выбранного провайдера |
 | GitHub быстро упирается в лимиты | проверить `GITHUB_PAT`, уменьшить `OTM_GITHUB_MAX_SEARCH_REQUESTS` для теста |
 | `setup_env.ps1` не запускается | использовать `powershell -ExecutionPolicy Bypass -File .\scripts\setup_env.ps1` |
+| Ollama не отвечает | убедиться, что `ollama serve` запущен; при нестандартном порту задать `LLM_BASE_URL` |
 
 ## Чистый перезапуск Docker
 

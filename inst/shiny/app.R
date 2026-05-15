@@ -1858,17 +1858,17 @@ app_ui <- bslib::page_navbar(
     )
   ),
   bslib::nav_panel(
-    "Pipeline",
+    "Пайплайн",
     app_shell(
       tags$section(
         class = "app-section",
         tags$div(
           class = "pipeline-toolbar",
           section_intro(
-            "Pipeline and runtime status",
-            "Операционный слой для локального workflow: видно состояние артефактов, текущий LLM runtime, статусы assessment rows, содержимое DuckDB и команды для ручного перезапуска нужного этапа."
+            "Пайплайн и мониторинг",
+            "Операционная панель: статусы обработки инструментов, текущая конфигурация нейросети, содержимое базы данных и команды для ручного перезапуска нужного этапа."
           ),
-          shiny::actionButton("pipeline_refresh", "Refresh status", class = "pipeline-refresh-button")
+          shiny::actionButton("pipeline_refresh", "Обновить", class = "pipeline-refresh-button")
         ),
         shiny::uiOutput("pipeline_metric_grid"),
         tags$div(
@@ -1876,13 +1876,13 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card plot-shell",
             full_screen = TRUE,
-            bslib::card_header("Assessment status"),
+            bslib::card_header("Статус оценки инструментов"),
             bslib::card_body(plotOutput("pipeline_status_plot", height = 360))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("LLM runtime"),
+            bslib::card_header("Конфигурация нейросети"),
             bslib::card_body(DT::dataTableOutput("pipeline_runtime_table"))
           )
         ),
@@ -1891,13 +1891,13 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Artifacts"),
+            bslib::card_header("Артефакты данных"),
             bslib::card_body(DT::dataTableOutput("pipeline_artifact_table"))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("DuckDB tables"),
+            bslib::card_header("Таблицы базы данных"),
             bslib::card_body(DT::dataTableOutput("pipeline_duckdb_table"))
           )
         ),
@@ -1906,25 +1906,25 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Discovery and rotation"),
+            bslib::card_header("Обнаружение и ротация запросов"),
             bslib::card_body(DT::dataTableOutput("pipeline_discovery_table"))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Recent pipeline stages"),
+            bslib::card_header("Этапы последнего запуска"),
             bslib::card_body(DT::dataTableOutput("pipeline_stage_history_table"))
           )
         ),
         bslib::card(
           class = "shell-card info-card",
-          bslib::card_header("Run comparison"),
+          bslib::card_header("Сравнение запусков"),
           bslib::card_body(
-            tags$p("Сравнение двух DuckDB-backed запусков по run_id: видно deltas по stage runtime, изменения в relevant tools и сдвиги в MITRE mappings."),
+            tags$p("Сравнение двух запусков пайплайна по идентификатору run_id: изменения времени выполнения по этапам, сдвиги в наборе инструментов и MITRE-маппингах."),
             tags$div(
               class = "pipeline-compare-controls",
-              shiny::selectInput("pipeline_compare_current_run", "Current run", choices = c("No runs available" = ""), selected = ""),
-              shiny::selectInput("pipeline_compare_baseline_run", "Baseline run", choices = c("No runs available" = ""), selected = "")
+              shiny::selectInput("pipeline_compare_current_run", "Текущий запуск", choices = c("Нет доступных запусков" = ""), selected = ""),
+              shiny::selectInput("pipeline_compare_baseline_run", "Базовый запуск", choices = c("Нет доступных запусков" = ""), selected = "")
             ),
             shiny::uiOutput("pipeline_run_compare_metric_grid")
           )
@@ -1934,13 +1934,13 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Available DuckDB runs"),
+            bslib::card_header("Доступные запуски"),
             bslib::card_body(DT::dataTableOutput("pipeline_run_catalog_table"))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Run summary diff"),
+            bslib::card_header("Сводное сравнение запусков"),
             bslib::card_body(DT::dataTableOutput("pipeline_run_compare_summary_table"))
           )
         ),
@@ -1949,13 +1949,13 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Stage-by-stage diff"),
+            bslib::card_header("Сравнение по этапам"),
             bslib::card_body(DT::dataTableOutput("pipeline_run_compare_stage_table"))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Relevant tools diff"),
+            bslib::card_header("Изменения в инструментах"),
             bslib::card_body(DT::dataTableOutput("pipeline_run_compare_tools_table"))
           )
         ),
@@ -1964,13 +1964,13 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("MITRE mappings diff"),
+            bslib::card_header("Изменения в MITRE-маппингах"),
             bslib::card_body(DT::dataTableOutput("pipeline_run_compare_mitre_table"))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Pipeline sanity checks"),
+            bslib::card_header("Диагностика пайплайна"),
             bslib::card_body(DT::dataTableOutput("pipeline_sanity_checks_table"))
           )
         ),
@@ -1979,13 +1979,13 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Recent GitHub search requests"),
+            bslib::card_header("Последние поисковые запросы GitHub"),
             bslib::card_body(DT::dataTableOutput("pipeline_github_query_log_table"))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Batch pipeline runs"),
+            bslib::card_header("Пакетные запуски пайплайна"),
             bslib::card_body(DT::dataTableOutput("pipeline_batch_summary_table"))
           )
         ),
@@ -1994,13 +1994,13 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("Top visualization rows right now"),
+            bslib::card_header("Топ инструментов (текущие данные)"),
             bslib::card_body(DT::dataTableOutput("pipeline_recent_tools_table"))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("LLM backlog and retry queue"),
+            bslib::card_header("Очередь и повторные попытки"),
             bslib::card_body(DT::dataTableOutput("pipeline_backlog_table"))
           )
         ),
@@ -2009,33 +2009,33 @@ app_ui <- bslib::page_navbar(
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("UI addition history"),
+            bslib::card_header("История добавления инструментов"),
             bslib::card_body(DT::dataTableOutput("pipeline_ui_history_table"))
           ),
           bslib::card(
             class = "shell-card table-shell",
             full_screen = TRUE,
-            bslib::card_header("LLM queue snapshot"),
+            bslib::card_header("Снимок очереди нейросети"),
             bslib::card_body(DT::dataTableOutput("pipeline_queue_table"))
           )
         ),
         bslib::card(
           class = "shell-card info-card code-block-card",
-          bslib::card_header("Quick actions"),
+          bslib::card_header("Быстрые действия"),
           bslib::card_body(
-            tags$p("Data directory used by the app:"),
+            tags$p("Директория данных приложения:"),
             tags$pre(class = "command-block", extdata_dir),
-            tags$p("Rebuild visualization layer:"),
+            tags$p("Пересобрать слой визуализации (запускать после изменения данных):"),
             tags$pre(class = "command-block", 'Rscript data-raw/build_visualization_data.R'),
-            tags$p("Inspect LLM queue:"),
+            tags$p("Просмотр очереди нейросети (текущее состояние задач):"),
             tags$pre(class = "command-block", 'Rscript data-raw/inspect_llm_queue.R'),
-            tags$p("Run unified LLM assessment:"),
+            tags$p("Запустить оценку инструментов нейросетью:"),
             tags$pre(class = "command-block", 'Rscript data-raw/run_unified_tool_assessment.R'),
-            tags$p("Run full pipeline 5 times in a row:"),
+            tags$p("Запустить полный пайплайн 5 раз подряд (пакетный режим):"),
             tags$pre(class = "command-block", 'Rscript data-raw/run_full_pipeline_batch.R 5'),
-            tags$p("Run MITRE refinement stage:"),
+            tags$p("Запустить этап уточнения MITRE-маппингов:"),
             tags$pre(class = "command-block", 'Rscript data-raw/run_mitre_refinement.R'),
-            tags$p("Start MCP server in stdio mode:"),
+            tags$p("Запустить MCP-сервер в режиме stdio:"),
             tags$pre(class = "command-block", 'Rscript inst/mcp/run_server.R')
           )
         )
@@ -2047,10 +2047,24 @@ app_ui <- bslib::page_navbar(
 app_server <- function(input, output, session) {
   selected_record_id <- shiny::reactiveVal(NULL)
 
+  viz_poll <- shiny::reactivePoll(
+    intervalMillis = 5000,
+    session = session,
+    checkFunc = function() {
+      files <- c(
+        file.path(extdata_dir, "visualization_tools.rds"),
+        file.path(extdata_dir, "visualization_tool_matrix.rds")
+      )
+      sapply(files, function(f) if (file.exists(f)) as.numeric(file.mtime(f)) else -1)
+    },
+    valueFunc = function() {
+      load_visualization_snapshot(extdata_dir)
+    }
+  )
+
   visualization_snapshot <- shiny::reactive({
     input$pipeline_refresh
-    shiny::invalidateLater(10000, session)
-    load_visualization_snapshot(extdata_dir)
+    viz_poll()
   })
 
   pipeline_snapshot <- shiny::reactive({
@@ -2068,10 +2082,21 @@ app_server <- function(input, output, session) {
     )
   })
 
+  refinement_poll <- shiny::reactivePoll(
+    intervalMillis = 5000,
+    session = session,
+    checkFunc = function() {
+      path <- file.path(extdata_dir, "mitre_refinement_candidates.rds")
+      if (file.exists(path)) as.numeric(file.mtime(path)) else -1
+    },
+    valueFunc = function() {
+      load_refinement_candidates(extdata_dir)
+    }
+  )
+
   refinement_candidates <- shiny::reactive({
     input$pipeline_refresh
-    shiny::invalidateLater(10000, session)
-    load_refinement_candidates(extdata_dir)
+    refinement_poll()
   })
 
   shiny::observe({
