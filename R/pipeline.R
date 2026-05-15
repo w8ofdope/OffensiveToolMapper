@@ -11,7 +11,7 @@ if (getRversion() >= "2.15.1") {
   ))
 }
 
-.pipeline_stage_order <- function(include_validation = FALSE, include_mitre_refinement = FALSE, include_webapp_export = FALSE) {
+.pipeline_stage_order <- function(include_validation = FALSE, include_mitre_refinement = FALSE) {
   stages <- c("collect", "normalize")
 
   if (isTRUE(include_validation)) {
@@ -24,13 +24,7 @@ if (getRversion() >= "2.15.1") {
     stages <- c(stages, "refine_mitre")
   }
 
-  stages <- c(stages, "visualize")
-
-  if (isTRUE(include_webapp_export)) {
-    stages <- c(stages, "export_webapp")
-  }
-
-  stages
+  c(stages, "visualize")
 }
 
 .pipeline_timestamp <- function(value = Sys.time()) {
@@ -851,24 +845,6 @@ if (getRversion() >= "2.15.1") {
   )
 }
 
-.pipeline_run_export <- function(data_dir, webapp_data_dir, visualization_tools, visualization_tool_matrix) {
-  result <- export_webapp_data(
-    tools = visualization_tools,
-    matrix = visualization_tool_matrix,
-    data_dir = data_dir,
-    webapp_data_dir = webapp_data_dir
-  )
-
-  list(
-    state = list(webapp_export = result),
-    details = list(
-      tools_json_rows = length(result$tools),
-      matrix_json_rows = length(result$matrix),
-      webapp_data_dir = webapp_data_dir
-    )
-  )
-}
-
 .pipeline_run_existing_backlog <- function(
   data_dir,
   status_table,
@@ -888,9 +864,7 @@ if (getRversion() >= "2.15.1") {
   refinement_min_score,
   overwrite_refinement_index,
   mitre_attack,
-  mitre_attack_path,
-  export_webapp,
-  webapp_data_dir
+  mitre_attack_path
 ) {
   normalized_path <- file.path(data_dir, "normalized_tools.rds")
   normalized_data <- load_pipeline_table("normalized_candidates", rds_path = normalized_path, db_path = duckdb_path, required = FALSE)
@@ -916,7 +890,6 @@ if (getRversion() >= "2.15.1") {
     mitre_mappings = NULL,
     visualization_tools = NULL,
     visualization_tool_matrix = NULL,
-    webapp_export = NULL,
     mitre_refinement_candidates = NULL
   )
 
@@ -925,9 +898,6 @@ if (getRversion() >= "2.15.1") {
     preflight_stages <- c(preflight_stages, "preflight_refine_mitre")
   }
   preflight_stages <- c(preflight_stages, "preflight_visualize")
-  if (isTRUE(export_webapp)) {
-    preflight_stages <- c(preflight_stages, "preflight_export_webapp")
-  }
 
   for (current_stage in preflight_stages) {
     started_at <- Sys.time()
@@ -966,12 +936,6 @@ if (getRversion() >= "2.15.1") {
           mitre_mappings = state$mitre_mappings,
           write_duckdb = write_duckdb,
           duckdb_path = duckdb_path
-        ),
-        preflight_export_webapp = .pipeline_run_export(
-          data_dir = data_dir,
-          webapp_data_dir = webapp_data_dir,
-          visualization_tools = state$visualization_tools,
-          visualization_tool_matrix = state$visualization_tool_matrix
         ),
         stop(sprintf("Unsupported backlog preflight stage '%s'.", current_stage), call. = FALSE)
       ),
@@ -1031,7 +995,7 @@ run_full_pipeline <- function(...) {
 
 #' Run the OffensiveToolMapper pipeline from a specific stage
 #'
-#' @param stage Start stage. One of `collect`, `normalize`, `validation`, `assessment`, `visualize`, `export_webapp`.
+#' @param stage Start stage. One of `collect`, `normalize`, `validation`, `assessment`, `refine_mitre`, `visualize`.
 #' @param end_stage Optional final stage to stop at.
 #' @param data_dir Directory for pipeline artifacts.
 #' @param status_path Path where pipeline stage status is persisted.
@@ -1067,8 +1031,6 @@ run_full_pipeline <- function(...) {
 #' @param process_existing_backlog Whether to assess and publish the current normalized backlog before running a fresh collection pass.
 #' @param write_duckdb Whether DuckDB outputs should be written.
 #' @param duckdb_path DuckDB database path.
-#' @param export_webapp Whether to export JSON for the React webapp.
-#' @param webapp_data_dir Output directory for React JSON files.
 #' @param run_mitre_refinement Whether to generate retrieval-based MITRE refinement suggestions.
 #' @param refinement_top_k Maximum number of refinement candidates per tool.
 #' @param refinement_min_score Minimum retrieval score to keep.
@@ -1080,7 +1042,7 @@ run_full_pipeline <- function(...) {
 #'
 #' @return Named list with intermediate outputs and the persisted `pipeline_status` table.
 run_pipeline_from <- function(
-  stage = c("collect", "normalize", "validation", "assessment", "refine_mitre", "visualize", "export_webapp"),
+  stage = c("collect", "normalize", "validation", "assessment", "refine_mitre", "visualize"),
   end_stage = NULL,
   data_dir = get_default_data_dir(),
   status_path = file.path(data_dir, "pipeline_status.rds"),
@@ -1114,8 +1076,6 @@ run_pipeline_from <- function(
   process_existing_backlog = TRUE,
   write_duckdb = TRUE,
   duckdb_path = get_default_duckdb_path(data_dir),
-  export_webapp = FALSE,
-  webapp_data_dir = file.path(getwd(), "webapp", "public", "data"),
   run_mitre_refinement = FALSE,
   refinement_top_k = 8L,
   refinement_min_score = 0.12,
@@ -1131,8 +1091,7 @@ run_pipeline_from <- function(
 
   available_stages <- .pipeline_stage_order(
     include_validation = run_legacy_validation,
-    include_mitre_refinement = run_mitre_refinement,
-    include_webapp_export = export_webapp
+    include_mitre_refinement = run_mitre_refinement
   )
 
   stage <- match.arg(stage, available_stages)
@@ -1162,7 +1121,6 @@ run_pipeline_from <- function(
     validation_results = NULL,
     enriched_tools = NULL,
     relevant_tools = NULL,
-    webapp_export = NULL,
     mitre_refinement_candidates = NULL,
     pipeline_sanity_checks = NULL
   )
@@ -1187,9 +1145,7 @@ run_pipeline_from <- function(
       refinement_min_score = refinement_min_score,
       overwrite_refinement_index = overwrite_refinement_index,
       mitre_attack = mitre_attack,
-      mitre_attack_path = mitre_attack_path,
-      export_webapp = export_webapp,
-      webapp_data_dir = webapp_data_dir
+      mitre_attack_path = mitre_attack_path
     )
 
     status_table <- preflight_result$status_table
@@ -1269,12 +1225,6 @@ run_pipeline_from <- function(
           mitre_mappings = state$mitre_mappings,
           write_duckdb = write_duckdb,
           duckdb_path = duckdb_path
-        ),
-        export_webapp = .pipeline_run_export(
-          data_dir = data_dir,
-          webapp_data_dir = webapp_data_dir,
-          visualization_tools = state$visualization_tools,
-          visualization_tool_matrix = state$visualization_tool_matrix
         ),
         stop(sprintf("Unsupported pipeline stage '%s'.", current_stage), call. = FALSE)
       ),

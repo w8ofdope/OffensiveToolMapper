@@ -18,11 +18,7 @@ targets <- c(
   file.path(project_root, "inst", "extdata", "tool_mitre_mappings.rds"),
   file.path(project_root, "inst", "extdata", "visualization_tools.rds"),
   file.path(project_root, "inst", "extdata", "visualization_tool_history.rds"),
-  file.path(project_root, "inst", "extdata", "visualization_tool_matrix.rds"),
-  file.path(project_root, "webapp", "public", "data", "matrix.json"),
-  file.path(project_root, "webapp", "public", "data", "refinement.json"),
-  file.path(project_root, "webapp", "public", "data", "summary.json"),
-  file.path(project_root, "webapp", "public", "data", "tools.json")
+  file.path(project_root, "inst", "extdata", "visualization_tool_matrix.rds")
 )
 
 existing_targets <- targets[file.exists(targets)]

@@ -111,35 +111,6 @@ test_that("run_pipeline_from can resume at visualize using supplied assessment a
   expect_equal(result$pipeline_status$stage[[1]], "visualize")
 })
 
-test_that("export_webapp_data writes JSON payloads for the React frontend", {
-  webapp_data_dir <- tempfile(pattern = "webapp-data-")
-  dir.create(webapp_data_dir, recursive = TRUE, showWarnings = FALSE)
-
-  tools <- tibble::tibble(
-    assessed_name = "Sliver",
-    short_description_ru = "Краткое описание",
-    visualization_rank = 1L,
-    visualization_score = 0.95,
-    confidence_score = 0.94,
-    source = "github",
-    entity_type = "framework",
-    mitre_technique_count = 2L
-  )
-
-  matrix <- tibble::tibble(
-    assessed_name = "Sliver",
-    tactic = "Command and Control",
-    technique_id = "T1071",
-    technique_name = "Application Layer Protocol"
-  )
-
-  export_webapp_data(tools = tools, matrix = matrix, webapp_data_dir = webapp_data_dir)
-
-  expect_true(file.exists(file.path(webapp_data_dir, "summary.json")))
-  expect_true(file.exists(file.path(webapp_data_dir, "tools.json")))
-  expect_true(file.exists(file.path(webapp_data_dir, "matrix.json")))
-})
-
 test_that("run_pipeline_from can execute the optional MITRE refinement stage", {
   data_dir <- tempfile(pattern = "pipeline-data-")
   dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)

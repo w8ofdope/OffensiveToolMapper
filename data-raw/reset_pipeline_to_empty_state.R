@@ -12,11 +12,9 @@ source(file.path(project_root, "R", "llm_validation.R"))
 source(file.path(project_root, "R", "storage_duckdb.R"))
 source(file.path(project_root, "R", "llm_assessment.R"))
 source(file.path(project_root, "R", "visualization_data.R"))
-source(file.path(project_root, "R", "webapp_export.R"))
 source(file.path(project_root, "R", "pipeline.R"))
 
 data_dir <- file.path(project_root, "inst", "extdata")
-webapp_data_dir <- file.path(project_root, "webapp", "public", "data")
 
 targets <- c(
   file.path(data_dir, "debug_deepseek_unified_response.txt"),
@@ -38,11 +36,7 @@ targets <- c(
   file.path(data_dir, "enriched_tools.rds"),
   file.path(data_dir, "visualization_tools.rds"),
   file.path(data_dir, "visualization_tool_history.rds"),
-  file.path(data_dir, "visualization_tool_matrix.rds"),
-  file.path(webapp_data_dir, "matrix.json"),
-  file.path(webapp_data_dir, "refinement.json"),
-  file.path(webapp_data_dir, "summary.json"),
-  file.path(webapp_data_dir, "tools.json")
+  file.path(data_dir, "visualization_tool_matrix.rds")
 )
 
 existing_targets <- targets[file.exists(targets)]
@@ -52,7 +46,6 @@ if (length(existing_targets) > 0) {
 }
 
 ensure_dir(data_dir)
-ensure_dir(webapp_data_dir)
 
 raw_github <- .github_empty_detail_results()
 raw_packetstorm <- .packetstorm_empty_results()
@@ -92,14 +85,6 @@ visualization <- build_visualization_dataset(
 )
 
 .pipeline_save_status(.pipeline_empty_status(), file.path(data_dir, "pipeline_status.rds"))
-
-export_webapp_data(
-  tools = visualization$visualization_tools,
-  matrix = visualization$visualization_tool_matrix,
-  refinement = tibble::tibble(),
-  data_dir = data_dir,
-  webapp_data_dir = webapp_data_dir
-)
 
 cat(sprintf("Deleted %s generated artifacts and recreated empty state.\n", length(existing_targets)))
 cat(sprintf("raw_github=%s\n", nrow(raw_github)))

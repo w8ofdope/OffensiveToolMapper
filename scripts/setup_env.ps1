@@ -161,8 +161,7 @@ Add-EnvLine $lines "OTM_GITHUB_MIN_STARS" "10"
 Add-EnvLine $lines "OTM_GITHUB_MAX_RESULTS" "100"
 Add-EnvLine $lines "OTM_GITHUB_MAX_SEARCH_REQUESTS" $GithubMaxSearchRequests
 $lines.Add("")
-$lines.Add("# UI/MCP")
-Add-EnvLine $lines "MODERN_UI_URL" "http://localhost:5173"
+$lines.Add("# Shiny/MCP")
 Add-EnvLine $lines "OTM_MCP_TRANSPORT" "http"
 Add-EnvLine $lines "OTM_MCP_PORT" "3000"
 Add-EnvLine $lines "OFFENSIVETOOLMAPPER_DATA_DIR" ""
@@ -174,6 +173,5 @@ Write-Host "Next command:"
 Write-Host "  docker compose up --build"
 Write-Host ""
 Write-Host "After startup:"
-Write-Host "  React/Vite UI: http://localhost:5173"
-Write-Host "  Shiny:         http://localhost:8788"
-Write-Host "  MCP server:    http://localhost:3000"
+Write-Host "  Shiny app:  http://localhost:8788"
+Write-Host "  MCP server: http://localhost:3000"

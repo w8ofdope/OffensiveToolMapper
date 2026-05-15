@@ -4,13 +4,12 @@
 
 ## Что запускается
 
-`docker compose up --build` поднимает три сервиса:
+`docker compose up --build` поднимает два сервиса:
 
 | Сервис | URL | Назначение |
 | --- | --- | --- |
-| Web UI | `http://localhost:5173` | основной интерфейс с инструментами и MITRE-связями |
-| Shiny | `http://localhost:8788` | аналитическая панель и диагностика pipeline |
-| MCP server | `http://localhost:3000` | HTTP MCP-сервер поверх готовых данных проекта |
+| Shiny-приложение | `http://localhost:8788` | основной интерфейс: обзор, аналитика, инструменты, MITRE-связи и pipeline |
+| MCP-сервер | `http://localhost:3000` | HTTP MCP-сервер поверх готовых данных проекта |
 
 Первый запуск возможен без собранных данных: интерфейсы откроются, но список инструментов может быть пустым. Реальные записи появляются после запуска pipeline.
 
@@ -20,7 +19,7 @@
 
 - Docker Desktop;
 - включённый Docker daemon;
-- доступ к интернету для установки Docker/R/Node-зависимостей при первой сборке.
+- доступ к интернету для установки Docker/R-зависимостей при первой сборке.
 
 Проверка Docker:
 
@@ -31,17 +30,13 @@ docker compose version
 
 Если `docker info` не подключается к Docker API, сначала запусти Docker Desktop.
 
-Для локальных проверок без Docker дополнительно нужны:
-
-- R;
-- Node.js;
-- npm.
+Для локальных проверок без Docker дополнительно нужен R.
 
 ## Быстрый старт
 
 ```powershell
-git clone https://github.com/KNikitaaa/CyberSecML-NetAdmins.git
-cd CyberSecML-NetAdmins
+git clone https://github.com/w8ofdope/OffensiveToolMapper.git
+cd OffensiveToolMapper
 .\scripts\setup_env.ps1
 docker compose up --build
 ```
@@ -119,7 +114,6 @@ GITHUB_PAT=github_pat_...
 
 Обычно не нужно менять:
 
-- `MODERN_UI_URL`;
 - `OTM_MCP_TRANSPORT`;
 - `OTM_MCP_PORT`;
 - `OFFENSIVETOOLMAPPER_DATA_DIR`.
@@ -141,7 +135,6 @@ GITHUB_PAT=github_pat_...
 | `OTM_GITHUB_MIN_STARS` | минимальное число stars для GitHub discovery |
 | `OTM_GITHUB_MAX_RESULTS` | лимит результатов GitHub discovery |
 | `OTM_GITHUB_MAX_SEARCH_REQUESTS` | лимит GitHub search-запросов за запуск |
-| `MODERN_UI_URL` | URL web UI для Shiny |
 | `OTM_MCP_TRANSPORT` | транспорт MCP, в Docker используется `http` |
 | `OTM_MCP_PORT` | порт MCP HTTP-сервера |
 | `OFFENSIVETOOLMAPPER_DATA_DIR` | директория артефактов; в Docker задаётся автоматически |
@@ -154,7 +147,6 @@ docker compose up --build
 
 Открыть:
 
-- `http://localhost:5173`;
 - `http://localhost:8788`;
 - `http://localhost:3000`.
 
@@ -180,7 +172,7 @@ docker compose run --rm shiny-app Rscript data-raw/run_full_pipeline.R
 docker compose up --build
 ```
 
-После pipeline в web UI должны появиться карточки инструментов, тактики и техники MITRE.
+После pipeline в Shiny-приложении должны появиться карточки инструментов, тактики и техники MITRE.
 
 ## Проверка проекта
 
@@ -196,20 +188,13 @@ docker compose up --build
 - `docker compose config`;
 - доступность Docker daemon;
 - R-тесты;
-- экспорт данных для web UI;
-- `npm audit`;
-- сборку web UI.
+- загрузку Shiny-приложения.
 
 Проверки по отдельности:
 
 ```powershell
 docker compose config --quiet
 & "C:\Program Files\R\R-4.5.1\bin\Rscript.exe" data-raw\run_tests.R
-& "C:\Program Files\R\R-4.5.1\bin\Rscript.exe" data-raw\export_webapp_data.R
-cd webapp
-npm audit
-npm run build
-cd ..
 ```
 
 ## Проверка URL
@@ -217,7 +202,6 @@ cd ..
 После `docker compose up --build`:
 
 ```powershell
-Invoke-WebRequest http://127.0.0.1:5173 -UseBasicParsing
 Invoke-WebRequest http://127.0.0.1:8788 -UseBasicParsing
 ```
 
@@ -228,11 +212,10 @@ Invoke-WebRequest http://127.0.0.1:8788 -UseBasicParsing
 | Проблема | Решение |
 | --- | --- |
 | `failed to connect to docker API` | запустить Docker Desktop |
-| Web UI пустой | заполнить `.env` и запустить pipeline |
+| Shiny-приложение пустое | заполнить `.env` и запустить pipeline |
 | LLM-этапы не работают | проверить `LLM_PROVIDER` и ключ выбранного провайдера |
 | GitHub быстро упирается в лимиты | проверить `GITHUB_PAT`, уменьшить `OTM_GITHUB_MAX_SEARCH_REQUESTS` для теста |
 | `setup_env.ps1` не запускается | использовать `powershell -ExecutionPolicy Bypass -File .\scripts\setup_env.ps1` |
-| `modern-ui` падает на Windows `node_modules` | в compose используется отдельный volume `webapp_node_modules`; перезапусти `docker compose up --build` |
 
 ## Чистый перезапуск Docker
 
@@ -241,7 +224,7 @@ docker compose down
 docker compose up --build
 ```
 
-Если нужно пересоздать volume с Node-зависимостями контейнера:
+Если нужно полностью пересоздать контейнеры и volumes:
 
 ```powershell
 docker compose down -v

@@ -6,7 +6,7 @@
 \usage{
 run_pipeline_from(
   stage = c("collect", "normalize", "validation", "assessment", "refine_mitre",
-    "visualize", "export_webapp"),
+    "visualize"),
   end_stage = NULL,
   data_dir = get_default_data_dir(),
   status_path = file.path(data_dir, "pipeline_status.rds"),
@@ -37,8 +37,6 @@ run_pipeline_from(
   api_key = get_llm_api_key(provider),
   write_duckdb = TRUE,
   duckdb_path = get_default_duckdb_path(data_dir),
-  export_webapp = FALSE,
-  webapp_data_dir = file.path(getwd(), "webapp", "public", "data"),
   run_mitre_refinement = FALSE,
   refinement_top_k = 8L,
   refinement_min_score = 0.12,
@@ -50,7 +48,7 @@ run_pipeline_from(
 )
 }
 \arguments{
-\item{stage}{Start stage. One of \code{collect}, \code{normalize}, \code{validation}, \code{assessment}, \code{visualize}, \code{export_webapp}.}
+\item{stage}{Start stage. One of \code{collect}, \code{normalize}, \code{validation}, \code{assessment}, \code{refine_mitre}, \code{visualize}.}
 
 \item{end_stage}{Optional final stage to stop at.}
 
@@ -111,10 +109,6 @@ run_pipeline_from(
 \item{write_duckdb}{Whether DuckDB outputs should be written.}
 
 \item{duckdb_path}{DuckDB database path.}
-
-\item{export_webapp}{Whether to export JSON for the React webapp.}
-
-\item{webapp_data_dir}{Output directory for React JSON files.}
 
 \item{run_mitre_refinement}{Whether to generate retrieval-based MITRE refinement suggestions.}
 

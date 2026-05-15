@@ -13,27 +13,22 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 # Что делает проект
 
-`OffensiveToolMapper` собирает offensive security инструменты из открытых источников,
-нормализует их, проводит LLM-оценку, строит MITRE ATT&CK mapping и публикует
-результаты в трёх прикладных слоях:
+`OffensiveToolMapper` собирает инструменты из открытых источников, нормализует их, проводит LLM-оценку, строит MITRE ATT&CK-связи и показывает результат в двух слоях:
 
-- Shiny dashboard для аналитика;
-- modern React UI для продуктового представления данных;
-- MCP server для AI-агентов и внешних ассистентов.
+- Shiny-приложение для человека;
+- MCP-сервер для AI-клиентов и внешней автоматизации.
 
-# Основной поток данных
+# Поток данных
 
-Проект работает как последовательный pipeline:
+1. Сбор из GitHub, PacketStorm и RSS.
+2. Нормализация и фильтрация нерелевантных кандидатов.
+3. Оценка через LLM.
+4. Уточнение MITRE-связей.
+5. Подготовка RDS-артефактов для Shiny и MCP.
 
-1. ETL из GitHub, PacketStorm и RSS;
-2. нормализация и фильтрация нерелевантных кандидатов;
-3. unified one-call LLM assessment;
-4. retrieval-first MITRE refinement;
-5. visualization/export слой для UI и MCP.
+# Основные артефакты
 
-# Ключевые артефакты
-
-После полного прогона в каталоге `inst/extdata/` обычно появляются:
+После полного прогона в `inst/extdata/` появляются:
 
 - `normalized_tools.rds`;
 - `tool_assessment_results.rds`;
@@ -44,20 +39,12 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 - `visualization_tool_matrix.rds`;
 - `offensive_tool_mapper.duckdb`.
 
-Для modern UI дополнительно экспортируются JSON-артефакты в `webapp/public/data/`.
-
-# Минимальный локальный запуск
+# Локальный запуск
 
 Полный прогон пайплайна:
 
 ```{r eval = FALSE}
 source("data-raw/run_full_pipeline.R")
-```
-
-Только unified assessment:
-
-```{r eval = FALSE}
-source("data-raw/run_unified_tool_assessment.R")
 ```
 
 Только тесты:
@@ -66,38 +53,23 @@ source("data-raw/run_unified_tool_assessment.R")
 source("data-raw/run_tests.R")
 ```
 
-# Что важно про LLM runtime
+# LLM-настройки
 
-Основной runtime-path использует DeepSeek по умолчанию. OpenAI остаётся fallback-вариантом.
-Настройка делается через переменные окружения:
+Провайдер и модель задаются переменными окружения:
 
-- `DEEPSEEK_API_KEY`;
-- `OPENAI_API_KEY`;
 - `LLM_PROVIDER`;
 - `LLM_MODEL`;
 - `LLM_BASE_URL`;
+- `OPENAI_API_KEY`;
+- `DEEPSEEK_API_KEY`;
 - `LLM_MAX_RECORDS`.
 
-# Интерфейсы потребления
+# Интерфейсы
 
 ## Shiny
 
-Shiny dashboard показывает:
-
-- overview с топовыми инструментами;
-- MITRE heatmap и распределение по tactic;
-- таблицу инструментов с фильтрами;
-- operational-вкладку со статусом pipeline и артефактов.
-
-## Modern UI
-
-React/Vite слой использует JSON-экспорт и даёт отдельные режимы:
-
-- overview;
-- analytics;
-- explorer.
+Shiny является единственным пользовательским веб-интерфейсом. В нем находятся обзор, карточки инструментов, MITRE-аналитика и вкладка пайплайна.
 
 ## MCP
 
-MCP server даёт инструменты для поиска по каталогу, получения MITRE-связей и базовой
-классификации новых кандидатов.
+MCP-сервер дает программный доступ к тем же данным: поиск по инструментам, получение техник и тактик, статистику и базовую классификацию новых кандидатов.

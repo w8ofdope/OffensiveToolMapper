@@ -85,7 +85,6 @@ source(file.path(project_root, "R", "viz_tools.R"))
 
 extdata_dir <- file.path(project_root, "inst", "extdata")
 asset_dir <- file.path(project_root, "inst", "shiny", "www")
-modern_ui_url <- Sys.getenv("MODERN_UI_URL", unset = "http://127.0.0.1:5173")
 duckdb_path <- file.path(extdata_dir, "offensive_tool_mapper.duckdb")
 
 visualization_tools <- .visualization_empty_tools()
@@ -329,6 +328,380 @@ load_refinement_candidates <- function(data_dir) {
   value[["mapping_status"]] <- ifelse(value[["already_mapped"]], "already_mapped", "needs_review")
   value <- value[order(value[["already_mapped"]], -value[["retrieval_score"]], value[["retrieval_rank"]]), , drop = FALSE]
   tibble::as_tibble(value)
+}
+
+modern_accent_palette <- c("#b42318", "#40b9b4", "#f59e0b", "#2563eb", "#7c3aed", "#0f766e")
+
+tactic_details <- c(
+  Reconnaissance = "Сбор первичной информации о целях, инфраструктуре, пользователях и внешнем периметре до активного доступа.",
+  "Resource Development" = "Подготовка ресурсов для операции: домены, инфраструктура, учётки, полезные нагрузки и вспомогательные сервисы.",
+  "Initial Access" = "Получение начальной точки входа в среду через уязвимость, публичный сервис, фишинг или внешний доступ.",
+  Execution = "Запуск команд, скриптов или полезной нагрузки на целевой системе.",
+  Persistence = "Закрепление доступа, чтобы вернуться в систему после перезапуска, смены сессии или устранения первичного входа.",
+  "Privilege Escalation" = "Повышение прав, переход от обычного пользователя к более привилегированному контексту.",
+  "Defense Evasion" = "Снижение заметности: обход защит, маскировка активности, отключение или затруднение детекта.",
+  "Credential Access" = "Получение паролей, токенов, хэшей и других материалов для дальнейшего доступа.",
+  Discovery = "Разведка уже внутри среды: пользователи, процессы, хосты, сети, домены, сервисы и права.",
+  "Lateral Movement" = "Перемещение между системами внутри сети с использованием доступов, удалённого выполнения или доверенных каналов.",
+  Collection = "Сбор данных внутри среды перед выгрузкой или дальнейшей обработкой.",
+  Exfiltration = "Вывод собранных данных из среды наружу через сетевые, облачные или иные каналы.",
+  "Command and Control" = "Поддержание канала управления между оператором и инструментом внутри среды.",
+  Impact = "Действия, которые нарушают доступность, целостность или бизнес-процесс цели."
+)
+
+technique_hints <- c(
+  T1003 = "Получение учётных данных из памяти, хранилищ ОС или связанных credential-артефактов.",
+  T1018 = "Поиск удалённых систем, узлов и доступных направлений для дальнейшего движения.",
+  T1021 = "Использование удалённых сервисов для перехода на другие машины или выполнения действий внутри сети.",
+  T1041 = "Передача данных через тот же канал, который используется для управления или связи.",
+  T1055 = "Встраивание кода в другой процесс, чтобы скрыть выполнение или получить контекст процесса.",
+  T1059 = "Запуск команд и скриптов через shell, PowerShell, Python, JavaScript или другие интерпретаторы.",
+  T1105 = "Передача файлов и полезной нагрузки между внешней инфраструктурой и целевой средой.",
+  T1133 = "Использование VPN, RDP, SSH, внешних панелей или других exposed remote access сервисов.",
+  T1190 = "Эксплуатация уязвимого публичного приложения или сервиса для начального входа.",
+  T1548 = "Злоупотребление механизмами повышения прав или обхода контроля привилегий.",
+  T1562 = "Отключение, обход или ослабление защитных механизмов и средств мониторинга.",
+  T1573 = "Защита C2-канала шифрованием или нестандартным туннелированием связи.",
+  T1583 = "Создание или аренда инфраструктуры: доменов, серверов, учёток, сертификатов и связанных ресурсов.",
+  T1588 = "Получение готовых возможностей: инструментов, эксплойтов, сертификатов, аккаунтов или инфраструктуры.",
+  T1595 = "Активное сканирование внешнего периметра, сервисов или адресов для поиска целей и уязвимостей."
+)
+
+row_value <- function(row, column, default = NA_character_) {
+  if (!is.data.frame(row) || !(column %in% names(row)) || length(row[[column]]) == 0) {
+    return(default)
+  }
+
+  value <- row[[column]][[1]]
+
+  if (is.null(value) || length(value) == 0 || all(is.na(value))) {
+    return(default)
+  }
+
+  value
+}
+
+normalise_value_array <- function(value) {
+  if (is.null(value) || length(value) == 0) {
+    return(character())
+  }
+
+  flattened <- unlist(value, recursive = TRUE, use.names = FALSE)
+  flattened <- as.character(flattened)
+  flattened <- flattened[!is.na(flattened)]
+  flattened <- trimws(flattened)
+  flattened[nzchar(flattened)]
+}
+
+split_mitre_values <- function(value) {
+  items <- normalise_value_array(value)
+
+  if (length(items) == 0) {
+    return(character())
+  }
+
+  items <- unlist(strsplit(items, ",", fixed = TRUE), use.names = FALSE)
+  items <- trimws(items)
+  items <- gsub("^c\\(", "", items)
+  items <- gsub("\\)$", "", items)
+  items <- gsub("^[\"'`]+|[\"'`]+$", "", items)
+  unique(items[nzchar(items)])
+}
+
+clean_display_tags <- function(value) {
+  tags_value <- normalise_value_array(value)
+  tags_value <- tags_value[!grepl("^(mitre|source|entity|category):", tags_value, ignore.case = TRUE)]
+  unique(tags_value)
+}
+
+format_score <- function(value) {
+  number <- suppressWarnings(as.numeric(value[[1]] %||% NA_real_))
+
+  if (is.na(number)) {
+    return("н/д")
+  }
+
+  sprintf("%.2f", number)
+}
+
+rank_label <- function(value) {
+  rank <- suppressWarnings(as.integer(value[[1]] %||% NA_integer_))
+
+  if (is.na(rank)) {
+    return("н/д")
+  }
+
+  sprintf("#%s", rank)
+}
+
+format_meta_value <- function(value, fallback = "н/д") {
+  if (is.null(value) || length(value) == 0 || all(is.na(value))) {
+    return(fallback)
+  }
+
+  value <- paste(normalise_value_array(value), collapse = ", ")
+
+  if (!nzchar(value)) {
+    return(fallback)
+  }
+
+  value
+}
+
+tactic_description <- function(tactic) {
+  description <- tactic_details[[tactic]]
+
+  if (is.null(description) || is.na(description)) {
+    return("Тактика описывает крупную цель поведения: зачем инструмент использует связанные техники в этой части цепочки.")
+  }
+
+  description
+}
+
+describe_technique <- function(row) {
+  technique_id <- format_meta_value(row_value(row, "technique_id"), fallback = "")
+  normalized_id <- strsplit(technique_id, ".", fixed = TRUE)[[1]][[1]]
+
+  if (technique_id %in% names(technique_hints)) {
+    return(technique_hints[[technique_id]])
+  }
+
+  if (normalized_id %in% names(technique_hints)) {
+    return(technique_hints[[normalized_id]])
+  }
+
+  sprintf(
+    "Техника описывает действие или возможность из MITRE ATT&CK: %s.",
+    format_meta_value(row_value(row, "technique_name"), fallback = "название пока не указано")
+  )
+}
+
+build_selected_ttp_groups <- function(matrix_rows) {
+  if (!is.data.frame(matrix_rows) || nrow(matrix_rows) == 0) {
+    return(list())
+  }
+
+  groups <- list()
+
+  for (index in seq_len(nrow(matrix_rows))) {
+    row <- matrix_rows[index, , drop = FALSE]
+    tactics <- split_mitre_values(row_value(row, "tactic"))
+
+    if (length(tactics) == 0) {
+      tactics <- "Тактика не указана"
+    }
+
+    for (tactic in tactics) {
+      if (is.null(groups[[tactic]])) {
+        groups[[tactic]] <- list(
+          tactic = tactic,
+          description = tactic_description(tactic),
+          techniques = list()
+        )
+      }
+
+      groups[[tactic]][["techniques"]] <- append(groups[[tactic]][["techniques"]], list(row))
+    }
+  }
+
+  groups <- lapply(groups, function(group) {
+    confidences <- vapply(group$techniques, function(row) {
+      suppressWarnings(as.numeric(row_value(row, "confidence", 0)))
+    }, numeric(1))
+
+    group$avg_confidence <- if (length(confidences) > 0) mean(confidences, na.rm = TRUE) else NA_real_
+    group
+  })
+
+  groups[order(
+    -vapply(groups, function(group) length(group$techniques), integer(1)),
+    vapply(groups, function(group) group$tactic, character(1))
+  )]
+}
+
+tool_card_onclick <- function(record_id) {
+  sprintf(
+    "Shiny.setInputValue('tool_card_select', %s, {priority: 'event'})",
+    jsonlite::toJSON(as.character(record_id), auto_unbox = TRUE)
+  )
+}
+
+tool_list_cards <- function(tools, selected_id = NULL) {
+  if (!is.data.frame(tools) || nrow(tools) == 0) {
+    return(
+      tags$div(
+        class = "empty-detail utility-empty",
+        "Нет инструментов для текущих фильтров."
+      )
+    )
+  }
+
+  tags$div(
+    class = "utility-list-scroll",
+    lapply(seq_len(nrow(tools)), function(index) {
+      tool <- tools[index, , drop = FALSE]
+      record_id <- as.character(row_value(tool, "record_id", ""))
+      active_class <- if (identical(record_id, selected_id)) " is-active" else ""
+
+      tags$button(
+        type = "button",
+        class = paste0("utility-list-item", active_class),
+        onclick = tool_card_onclick(record_id),
+        tags$div(
+          class = "utility-list-topline",
+          tags$span(rank_label(row_value(tool, "visualization_rank"))),
+          tags$span(format_meta_value(row_value(tool, "source")))
+        ),
+        tags$h4(format_meta_value(row_value(tool, "assessed_name"))),
+        tags$p(format_meta_value(row_value(tool, "short_description_ru"), fallback = "Описание недоступно.")),
+        tags$div(
+          class = "utility-list-footer",
+          tags$span(format_meta_value(row_value(tool, "entity_type"))),
+          tags$span(sprintf("%s MITRE", format_meta_value(row_value(tool, "mitre_technique_count"), fallback = "0"))),
+          tags$span(sprintf("%s уверенность", format_score(row_value(tool, "confidence_score"))))
+        )
+      )
+    })
+  )
+}
+
+modern_metric_card <- function(label, value, meta) {
+  tags$article(
+    class = "metric-card-modern",
+    tags$div(class = "metric-icon-shell", substr(label, 1, 1)),
+    tags$div(
+      tags$div(class = "metric-label-modern", label),
+      tags$div(class = "metric-value-modern", value),
+      tags$div(class = "metric-meta-modern", meta)
+    )
+  )
+}
+
+modern_section_heading <- function(kicker, title, text = NULL, class = NULL) {
+  tags$div(
+    class = trimws(paste("section-heading heading-light", class)),
+    tags$div(
+      tags$div(class = "section-kicker-modern", kicker),
+      tags$h3(title)
+    ),
+    if (!is.null(text)) tags$p(text)
+  )
+}
+
+modern_top_tool_cards <- function(tools, limit = 4L) {
+  if (!is.data.frame(tools) || nrow(tools) == 0) {
+    return(tags$div(class = "empty-detail utility-empty", "Данных для карточек пока нет."))
+  }
+
+  visible <- utils::head(tools[order(tools[["visualization_rank"]]), , drop = FALSE], limit)
+
+  tags$div(
+    class = "featured-ribbon-grid",
+    lapply(seq_len(nrow(visible)), function(index) {
+      tool <- visible[index, , drop = FALSE]
+
+      tags$article(
+        class = "featured-ribbon-card glass-panel",
+        tags$div(
+          class = "featured-ribbon-meta",
+          tags$span(rank_label(row_value(tool, "visualization_rank"))),
+          tags$span(format_meta_value(row_value(tool, "source")))
+        ),
+        tags$h4(format_meta_value(row_value(tool, "assessed_name"))),
+        tags$p(format_meta_value(row_value(tool, "short_description_ru"), fallback = "Описание недоступно.")),
+        tags$div(
+          class = "featured-ribbon-footer",
+          tags$span(format_meta_value(row_value(tool, "entity_type"))),
+          tags$span(sprintf("%s MITRE", format_meta_value(row_value(tool, "mitre_technique_count"), fallback = "0")))
+        )
+      )
+    })
+  )
+}
+
+modern_count_records <- function(data, column, value_name = column, limit = 8L) {
+  if (!is.data.frame(data) || nrow(data) == 0 || !(column %in% names(data))) {
+    return(tibble::tibble(!!value_name := character(), count = integer()))
+  }
+
+  values <- data[[column]]
+  if (is.list(values)) {
+    values <- unlist(lapply(values, split_mitre_values), use.names = FALSE)
+  }
+
+  values <- as.character(values)
+  values <- values[!is.na(values) & nzchar(values)]
+
+  if (length(values) == 0) {
+    return(tibble::tibble(!!value_name := character(), count = integer()))
+  }
+
+  counted <- sort(table(values), decreasing = TRUE)
+  counted <- utils::head(counted, limit)
+  tibble::tibble(
+    !!value_name := names(counted),
+    count = as.integer(counted)
+  )
+}
+
+modern_coverage_summary <- function(tools, matrix) {
+  mapped_tools <- if (is.data.frame(tools) && nrow(tools) > 0) {
+    sum(tools[["mitre_technique_count"]] > 0, na.rm = TRUE)
+  } else {
+    0L
+  }
+  unique_tactics <- if (is.data.frame(matrix) && nrow(matrix) > 0) {
+    length(unique(unlist(lapply(matrix[["tactic"]], split_mitre_values), use.names = FALSE)))
+  } else {
+    0L
+  }
+  unique_techniques <- if (is.data.frame(matrix) && nrow(matrix) > 0) {
+    dplyr::n_distinct(matrix[["technique_id"]])
+  } else {
+    0L
+  }
+  avg_techniques <- if (is.data.frame(tools) && nrow(tools) > 0 && mapped_tools > 0) {
+    mean(tools[["mitre_technique_count"]][tools[["mitre_technique_count"]] > 0], na.rm = TRUE)
+  } else {
+    0
+  }
+
+  list(
+    list(label = "Инструменты со связями", value = mapped_tools, meta = "Утилиты с хотя бы одной MITRE-связью"),
+    list(label = "Уникальные тактики", value = unique_tactics, meta = "Разные тактики в текущей матрице"),
+    list(label = "Уникальные техники", value = unique_techniques, meta = "Уникальные technique_id в текущем слое"),
+    list(label = "Среднее техник", value = sprintf("%.2f", avg_techniques), meta = "Среднее число техник на связанный инструмент")
+  )
+}
+
+modern_refinement_summary <- function(refinement) {
+  if (!is.data.frame(refinement) || nrow(refinement) == 0) {
+    refinement <- empty_refinement_candidates()
+  }
+
+  gaps <- refinement[!refinement[["already_mapped"]], , drop = FALSE]
+
+  list(
+    list(label = "Кандидаты", value = nrow(refinement), meta = "Все дополнительные кандидаты из слоя уточнения"),
+    list(label = "На проверку", value = nrow(gaps), meta = "Новые связи, которых ещё нет в основной матрице"),
+    list(label = "Инструменты с зазорами", value = dplyr::n_distinct(gaps[["record_id"]]), meta = "Сколько профилей получили новые MITRE-кандидаты"),
+    list(label = "Уже подтверждено", value = sum(refinement[["already_mapped"]], na.rm = TRUE), meta = "Кандидаты, совпавшие с текущей матрицей"),
+    list(label = "Новые техники", value = dplyr::n_distinct(gaps[["technique_id"]]), meta = "Уникальные техники среди новых кандидатов")
+  )
+}
+
+modern_summary_cards <- function(items, class = "coverage-summary-grid") {
+  tags$div(
+    class = class,
+    lapply(items, function(item) {
+      tags$article(
+        class = "glass-panel coverage-summary-card",
+        tags$div(class = "detail-section-kicker", item$label),
+        tags$div(class = "coverage-summary-value", item$value),
+        tags$p(item$meta)
+      )
+    })
+  )
 }
 
 format_file_size <- function(path) {
@@ -1406,158 +1779,74 @@ app_ui <- bslib::page_navbar(
     shiny::includeCSS(file.path(asset_dir, "app.css"))
   ),
   bslib::nav_panel(
-    "Overview",
+    "Обзор",
     app_shell(
-      tags$section(
-        class = "app-section",
-        shiny::uiOutput("overview_hero_panel"),
-        section_intro(
-          "Что сейчас поднимается наверх",
-          "Здесь выше показываются не просто популярные записи, а более качественные offensive tools с хорошим confidence, подробным описанием и осмысленным MITRE coverage."
-        ),
-        shiny::uiOutput("overview_featured_cards"),
-        shiny::uiOutput("overview_metric_grid"),
-        bslib::card(
-          class = "shell-card plot-shell plot-shell-xl",
-          full_screen = TRUE,
-          bslib::card_header("Top ranked tools"),
-          bslib::card_body(plotOutput("top_tools_plot", height = 640))
-        ),
-        tags$div(
-          class = "plot-grid",
-          bslib::card(
-            class = "shell-card plot-shell",
-            full_screen = TRUE,
-            bslib::card_header("Tools by source"),
-            bslib::card_body(plotOutput("source_plot", height = 470))
-          ),
-          bslib::card(
-            class = "shell-card plot-shell",
-            full_screen = TRUE,
-            bslib::card_header("Confidence distribution"),
-            bslib::card_body(plotOutput("confidence_plot", height = 470))
-          )
-        ),
-        bslib::card(
-          class = "shell-card info-card",
-          bslib::card_header("Ranking model"),
-          bslib::card_body(
-            tags$p("Порядок наверху строится по visualization_score, а он уже собирается из нескольких post-LLM факторов."),
-            tags$div(
-              class = "chip-row",
-              tags$span(class = "tag-chip", "pre_llm_score"),
-              tags$span(class = "tag-chip", "confidence_score"),
-              tags$span(class = "tag-chip", "detail_score"),
-              tags$span(class = "tag-chip", "mitre_score"),
-              tags$span(class = "tag-chip", "entity_priority")
-            )
-          )
-        )
-      )
+      class = "shiny-tools-root modern-overview-root",
+      shiny::uiOutput("modern_overview_panel")
     )
   ),
   bslib::nav_panel(
-    "Tools",
+    "Инструменты",
     app_shell(
-      class = "app-shell-tools",
-      bslib::layout_sidebar(
-        sidebar = bslib::sidebar(
-          class = "filter-sidebar",
-          width = 260,
-          tags$div(class = "sidebar-title", "Filters"),
-          tags$p(class = "sidebar-copy", "Компактные фильтры слева, а основное пространство отдано browser-режиму: крупный список утилит и широкий detail-pane справа."),
-          shiny::selectInput("source_filter", "Source", choices = c("All"), selected = "All"),
-          shiny::selectInput("entity_filter", "Entity type", choices = c("All"), selected = "All"),
-          shiny::selectInput("tactic_filter", "MITRE tactic", choices = c("All"), selected = "All"),
-          shiny::selectInput("technique_filter", "MITRE technique", choices = c("All"), selected = "All"),
-          shiny::sliderInput("confidence_filter", "Min confidence", min = 0, max = 1, value = 0.5, step = 0.05),
-          shiny::sliderInput("top_n_filter", "Rows to display", min = 5, max = 100, value = 15, step = 1)
+      class = "app-shell-tools shiny-tools-root",
+      tags$section(
+        class = "explorer-shell",
+        id = "tool-explorer",
+        tags$div(
+          class = "section-heading heading-light explorer-heading",
+          tags$div(
+            tags$div(class = "section-kicker-modern", "Инструменты"),
+            tags$h3("Полноценный браузер по слою разведданных")
+          ),
+          tags$p(
+            "Здесь можно работать как в отдельном продукте: быстро фильтровать, искать и читать полный профиль инструмента без старой табличной раскладки."
+          )
         ),
-        tags$section(
-          class = "app-section tools-section",
-          section_intro(
-            "Tool browser",
-            "Теперь это именно браузер утилит: слева увеличенный список релевантных tools, справа единая подробная карточка выбранной утилиты, включая MITRE-связи ниже описания."
+        tags$div(
+          class = "explorer-controls glass-panel",
+          tags$div(
+            class = "control-block search-block",
+            tags$span("Поиск"),
+            shiny::textInput("tool_search", label = NULL, placeholder = "название, теги, описание...")
           ),
           tags$div(
-            class = "tool-content-grid",
-            bslib::card(
-              class = "shell-card table-shell tools-list-shell",
-              full_screen = TRUE,
-              bslib::card_header("Utility list"),
-              bslib::card_body(DT::dataTableOutput("tools_table"))
+            class = "control-block",
+            tags$span("Источник"),
+            shiny::selectInput("source_filter", label = NULL, choices = c("Все" = "All"), selected = "All", selectize = FALSE)
+          ),
+          tags$div(
+            class = "control-block",
+            tags$span("Тактика MITRE"),
+            shiny::selectInput("tactic_filter", label = NULL, choices = c("Все" = "All"), selected = "All", selectize = FALSE)
+          )
+        ),
+        tags$div(
+          class = "explorer-grid",
+          tags$section(
+            class = "utility-list-panel glass-panel",
+            tags$div(
+              class = "panel-heading-row",
+              tags$div(
+                tags$div(class = "section-kicker-modern", "Список утилит"),
+                shiny::uiOutput("tool_list_count")
+              ),
+              tags$span(class = "panel-chip", "По рангу")
             ),
-            bslib::card(
-              class = "shell-card detail-shell tool-details-shell",
-              full_screen = TRUE,
-              bslib::card_header("Tool details"),
-              bslib::card_body(
-                uiOutput("tool_detail_header"),
-                uiOutput("tool_detail_stats"),
-                uiOutput("tool_detail_meta"),
-                uiOutput("tool_detail_tags"),
-                tags$hr(),
-                uiOutput("tool_detail_body"),
-                tags$div(class = "detail-subsection-title", "MITRE refinement suggestions"),
-                tags$p(class = "detail-subsection-copy", "Retrieval-first слой ниже показывает candidate techniques для выбранной утилиты: отдельно видно, что уже совпадает с mapping-layer, а что ещё требует ручной проверки."),
-                uiOutput("tool_detail_refinement_cards"),
-                tags$div(class = "detail-subsection-title", "Selected tool MITRE"),
-                tags$p(class = "detail-subsection-copy", "Ниже показаны техники и тактики, связанные именно с выбранной утилитой."),
-                DT::dataTableOutput("selected_tool_matrix_table")
-              )
-            )
+            shiny::uiOutput("tool_list_cards")
+          ),
+          tags$section(
+            class = "detail-panel glass-panel",
+            shiny::uiOutput("tool_detail_panel")
           )
         )
       )
     )
   ),
   bslib::nav_panel(
-    "MITRE",
+    "Аналитика",
     app_shell(
-      tags$section(
-        class = "app-section",
-        section_intro(
-          "MITRE coverage",
-          "Матрица и распределения вынесены в более просторный layout: heatmap не зажат, а рядом остаётся аналитический слой с таблицей маппингов."
-        ),
-        shiny::uiOutput("mitre_refinement_metric_grid"),
-        tags$div(
-          class = "plot-grid refinement-grid",
-          bslib::card(
-            class = "shell-card plot-shell",
-            full_screen = TRUE,
-            bslib::card_header("MITRE refinement hotspots"),
-            bslib::card_body(plotOutput("mitre_refinement_plot", height = 520))
-          ),
-          bslib::card(
-            class = "shell-card table-shell",
-            full_screen = TRUE,
-            bslib::card_header("Refinement review queue"),
-            bslib::card_body(DT::dataTableOutput("mitre_refinement_table"))
-          )
-        ),
-        bslib::card(
-          class = "shell-card plot-shell plot-shell-xl",
-          full_screen = TRUE,
-          bslib::card_header("MITRE heatmap"),
-          bslib::card_body(plotOutput("heatmap_plot", height = 760))
-        ),
-        tags$div(
-          class = "plot-grid mitre-grid",
-          bslib::card(
-            class = "shell-card plot-shell",
-            full_screen = TRUE,
-            bslib::card_header("Tactic distribution"),
-            bslib::card_body(plotOutput("tactic_plot", height = 540))
-          ),
-          bslib::card(
-            class = "shell-card table-shell",
-            full_screen = TRUE,
-            bslib::card_header("Matrix rows"),
-            bslib::card_body(DT::dataTableOutput("matrix_table"))
-          )
-        )
-      )
+      class = "shiny-tools-root modern-analytics-root",
+      shiny::uiOutput("modern_analytics_panel")
     )
   ),
   bslib::nav_panel(
@@ -1732,8 +2021,6 @@ app_ui <- bslib::page_navbar(
             tags$pre(class = "command-block", 'Rscript data-raw/build_visualization_data.R'),
             tags$p("Inspect LLM queue:"),
             tags$pre(class = "command-block", 'Rscript data-raw/inspect_llm_queue.R'),
-            tags$p("Export JSON for modern UI:"),
-            tags$pre(class = "command-block", 'Rscript data-raw/export_webapp_data.R'),
             tags$p("Run unified LLM assessment:"),
             tags$pre(class = "command-block", 'Rscript data-raw/run_unified_tool_assessment.R'),
             tags$p("Run full pipeline 5 times in a row:"),
@@ -1746,20 +2033,12 @@ app_ui <- bslib::page_navbar(
         )
       )
     )
-  ),
-  bslib::nav_spacer(),
-  bslib::nav_item(
-    tags$a(
-      class = "modern-ui-link",
-      href = modern_ui_url,
-      target = "_blank",
-      rel = "noreferrer",
-      "Open Modern UI"
-    )
   )
 )
 
 app_server <- function(input, output, session) {
+  selected_record_id <- shiny::reactiveVal(NULL)
+
   visualization_snapshot <- shiny::reactive({
     input$pipeline_refresh
     shiny::invalidateLater(10000, session)
@@ -1793,24 +2072,23 @@ app_server <- function(input, output, session) {
     matrix_data <- snapshot$matrix
 
     current_source <- input$source_filter %||% "All"
-    current_entity <- input$entity_filter %||% "All"
     current_tactic <- input$tactic_filter %||% "All"
-    current_technique <- input$technique_filter %||% "All"
-    current_top_n <- input$top_n_filter %||% 15
 
     source_choices <- c("All", sort(unique(stats::na.omit(as.character(tools_data$source)))))
-    entity_choices <- c("All", sort(unique(stats::na.omit(as.character(tools_data$entity_type)))))
-    tactic_choices <- c("All", sort(unique(stats::na.omit(as.character(matrix_data$tactic)))))
-    technique_choices <- c("All", sort(unique(stats::na.omit(as.character(matrix_data$technique_id)))))
+    tactic_choices <- c("All", sort(unique(unlist(lapply(matrix_data$tactic, split_mitre_values), use.names = FALSE))))
 
-    shiny::updateSelectInput(session, "source_filter", choices = source_choices, selected = if (current_source %in% source_choices) current_source else "All")
-    shiny::updateSelectInput(session, "entity_filter", choices = entity_choices, selected = if (current_entity %in% entity_choices) current_entity else "All")
-    shiny::updateSelectInput(session, "tactic_filter", choices = tactic_choices, selected = if (current_tactic %in% tactic_choices) current_tactic else "All")
-    shiny::updateSelectInput(session, "technique_filter", choices = technique_choices, selected = if (current_technique %in% technique_choices) current_technique else "All")
-
-    slider_max <- max(5, nrow(tools_data))
-    slider_value <- min(max(5, current_top_n), slider_max)
-    shiny::updateSliderInput(session, "top_n_filter", min = 5, max = slider_max, value = slider_value)
+    shiny::updateSelectInput(
+      session,
+      "source_filter",
+      choices = stats::setNames(source_choices, ifelse(source_choices == "All", "Все", source_choices)),
+      selected = if (current_source %in% source_choices) current_source else "All"
+    )
+    shiny::updateSelectInput(
+      session,
+      "tactic_filter",
+      choices = stats::setNames(tactic_choices, ifelse(tactic_choices == "All", "Все", tactic_choices)),
+      selected = if (current_tactic %in% tactic_choices) current_tactic else "All"
+    )
   })
 
   shiny::observe({
@@ -1848,13 +2126,19 @@ app_server <- function(input, output, session) {
 
   filtered_matrix <- shiny::reactive({
     matrix_data <- visualization_snapshot()$matrix
+    tactic_filter <- input$tactic_filter %||% "All"
+    technique_filter <- input$technique_filter %||% "All"
 
-    if (!identical(input$tactic_filter, "All")) {
-      matrix_data <- matrix_data[matrix_data[["tactic"]] == input$tactic_filter, , drop = FALSE]
+    if (!identical(tactic_filter, "All")) {
+      matrix_data <- matrix_data[
+        vapply(matrix_data[["tactic"]], function(value) tactic_filter %in% split_mitre_values(value), logical(1)),
+        ,
+        drop = FALSE
+      ]
     }
 
-    if (!identical(input$technique_filter, "All")) {
-      matrix_data <- matrix_data[matrix_data[["technique_id"]] == input$technique_filter, , drop = FALSE]
+    if (!identical(technique_filter, "All")) {
+      matrix_data <- matrix_data[matrix_data[["technique_id"]] == technique_filter, , drop = FALSE]
     }
 
     matrix_data
@@ -1862,50 +2146,79 @@ app_server <- function(input, output, session) {
 
   filtered_tools <- shiny::reactive({
     tools_data <- visualization_snapshot()$tools
+    search_query <- tolower(trimws(input$tool_search %||% ""))
+    source_filter <- input$source_filter %||% "All"
+    tactic_filter <- input$tactic_filter %||% "All"
 
-    if (!identical(input$source_filter, "All")) {
-      tools_data <- tools_data[tools_data[["source"]] == input$source_filter, , drop = FALSE]
+    if (!identical(source_filter, "All")) {
+      tools_data <- tools_data[tools_data[["source"]] == source_filter, , drop = FALSE]
     }
 
-    if (!identical(input$entity_filter, "All")) {
-      tools_data <- tools_data[tools_data[["entity_type"]] == input$entity_filter, , drop = FALSE]
-    }
-
-    tools_data <- tools_data[tools_data[["confidence_score"]] >= input$confidence_filter, , drop = FALSE]
-
-    if (!identical(input$tactic_filter, "All")) {
+    if (!identical(tactic_filter, "All")) {
       tools_data <- tools_data[
-        vapply(tools_data[["mitre_tactics"]], function(value) input$tactic_filter %in% value, logical(1)),
+        vapply(tools_data[["mitre_tactics"]], function(value) tactic_filter %in% split_mitre_values(value), logical(1)),
         ,
         drop = FALSE
       ]
     }
 
-    if (!identical(input$technique_filter, "All")) {
+    if (nzchar(search_query)) {
       tools_data <- tools_data[
-        vapply(tools_data[["mitre_technique_ids"]], function(value) input$technique_filter %in% value, logical(1)),
+        vapply(seq_len(nrow(tools_data)), function(index) {
+          tool <- tools_data[index, , drop = FALSE]
+          haystack <- paste(
+            format_meta_value(row_value(tool, "assessed_name")),
+            format_meta_value(row_value(tool, "short_description_ru")),
+            format_meta_value(row_value(tool, "long_description_ru")),
+            format_meta_value(row_value(tool, "category_ru")),
+            format_meta_value(row_value(tool, "entity_type")),
+            paste(clean_display_tags(row_value(tool, "filter_tags")), collapse = " "),
+            sep = " "
+          )
+          grepl(search_query, tolower(haystack), fixed = TRUE)
+        }, logical(1)),
         ,
         drop = FALSE
       ]
     }
 
     tools_data <- tools_data[order(tools_data[["visualization_rank"]]), , drop = FALSE]
-    utils::head(tools_data, input$top_n_filter)
+    tools_data
+  })
+
+  shiny::observeEvent(input$tool_card_select, {
+    selected_record_id(as.character(input$tool_card_select))
+  }, ignoreInit = TRUE)
+
+  shiny::observe({
+    tools_data <- filtered_tools()
+    current_id <- selected_record_id()
+
+    if (nrow(tools_data) == 0) {
+      selected_record_id(NULL)
+      return()
+    }
+
+    available_ids <- as.character(tools_data[["record_id"]])
+
+    if (is.null(current_id) || !(current_id %in% available_ids)) {
+      selected_record_id(available_ids[[1]])
+    }
   })
 
   selected_tool <- shiny::reactive({
     tools_data <- filtered_tools()
-    selected_rows <- input$tools_table_rows_selected
+    current_id <- selected_record_id()
 
     if (nrow(tools_data) == 0) {
       return(tools_data[0, , drop = FALSE])
     }
 
-    if (length(selected_rows) == 0) {
+    if (is.null(current_id) || !(current_id %in% as.character(tools_data[["record_id"]]))) {
       return(tools_data[1, , drop = FALSE])
     }
 
-    tools_data[selected_rows[[1]], , drop = FALSE]
+    tools_data[as.character(tools_data[["record_id"]]) == current_id, , drop = FALSE]
   })
 
   selected_tool_matrix <- shiny::reactive({
@@ -1930,6 +2243,417 @@ app_server <- function(input, output, session) {
 
     refinement_data <- refinement_data[refinement_data[["record_id"]] == tool[["record_id"]][[1]], , drop = FALSE]
     refinement_data[order(refinement_data[["already_mapped"]], -refinement_data[["retrieval_score"]], refinement_data[["retrieval_rank"]]), , drop = FALSE]
+  })
+
+  output$modern_overview_panel <- shiny::renderUI({
+    snapshot <- visualization_snapshot()
+    tools_data <- snapshot$tools
+    matrix_data <- snapshot$matrix
+    featured_tool <- if (nrow(tools_data) > 0) tools_data[1, , drop = FALSE] else tools_data[0, , drop = FALSE]
+
+    tags$div(
+      tags$section(
+        class = "hero-shell",
+        tags$div(
+          class = "hero-copy-modern glass-panel",
+          tags$div(class = "eyebrow-modern", "Разведка по наступательным инструментам"),
+          tags$h1("Каталог утилит, сигналов и MITRE-связей в продуктовой оболочке"),
+          tags$p(
+            "Здесь собраны уже отфильтрованные и оценённые инструменты: удобнее смотреть, какие утилиты выходят наверх, из каких источников они приходят и как покрывают MITRE ATT&CK."
+          ),
+          tags$div(
+            class = "hero-strip",
+            modern_metric_card("Готовые карточки", nrow(tools_data), "LLM-оценка, описание, MITRE-связи"),
+            modern_metric_card("MITRE-связи", nrow(matrix_data), "Инструмент -> тактика -> техника"),
+            modern_metric_card(
+              "Первое место",
+              if (nrow(featured_tool) > 0) rank_label(row_value(featured_tool, "visualization_rank")) else "н/д",
+              if (nrow(featured_tool) > 0) format_meta_value(row_value(featured_tool, "assessed_name")) else "Нет данных"
+            )
+          )
+        ),
+        tags$aside(
+          class = "hero-spotlight-modern glass-panel",
+          tags$div(
+            class = "spotlight-topline",
+            tags$span(class = "eyebrow-modern", "Главный сигнал"),
+            tags$span(class = "spotlight-rank", if (nrow(featured_tool) > 0) rank_label(row_value(featured_tool, "visualization_rank")) else "н/д")
+          ),
+          tags$h2(if (nrow(featured_tool) > 0) format_meta_value(row_value(featured_tool, "assessed_name")) else "Нет данных"),
+          tags$p(if (nrow(featured_tool) > 0) format_meta_value(row_value(featured_tool, "short_description_ru"), fallback = "Описание недоступно.") else "Описание недоступно."),
+          tags$div(
+            class = "spotlight-stats-grid",
+            tags$div(tags$span("Источник"), tags$strong(if (nrow(featured_tool) > 0) format_meta_value(row_value(featured_tool, "source")) else "н/д")),
+            tags$div(tags$span("Уверенность"), tags$strong(if (nrow(featured_tool) > 0) format_score(row_value(featured_tool, "confidence_score")) else "н/д")),
+            tags$div(tags$span("Тип"), tags$strong(if (nrow(featured_tool) > 0) format_meta_value(row_value(featured_tool, "entity_type")) else "н/д")),
+            tags$div(tags$span("MITRE"), tags$strong(if (nrow(featured_tool) > 0) sprintf("%s техник", format_meta_value(row_value(featured_tool, "mitre_technique_count"), fallback = "0")) else "0 техник"))
+          ),
+          if (nrow(featured_tool) > 0 && length(clean_display_tags(row_value(featured_tool, "filter_tags"))) > 0) {
+            tags$div(
+              class = "tag-ribbon",
+              lapply(utils::head(clean_display_tags(row_value(featured_tool, "filter_tags")), 7), function(tag) tags$span(tag))
+            )
+          }
+        )
+      ),
+      tags$section(
+        class = "featured-ribbon-shell",
+        modern_section_heading("Лучшие утилиты", "Короткий срез лучших записей из текущего слоя"),
+        modern_top_tool_cards(tools_data, limit = 4L)
+      ),
+      tags$section(
+        class = "analytics-grid",
+        tags$article(
+          class = "glass-panel chart-card chart-card-wide",
+          modern_section_heading("Рейтинг", "Топ инструментов по итоговому score"),
+          plotOutput("top_tools_plot", height = 420)
+        ),
+        tags$article(
+          class = "glass-panel chart-card",
+          modern_section_heading("Источники", "Где чаще всего находятся инструменты"),
+          plotOutput("source_plot", height = 320)
+        ),
+        tags$article(
+          class = "glass-panel chart-card",
+          modern_section_heading("Качество сигнала", "Распределение уверенности"),
+          plotOutput("confidence_plot", height = 320)
+        )
+      )
+    )
+  })
+
+  output$modern_analytics_panel <- shiny::renderUI({
+    snapshot <- visualization_snapshot()
+    tools_data <- snapshot$tools
+    matrix_data <- snapshot$matrix
+    refinement_data <- refinement_candidates()
+
+    tags$section(
+      class = "analytics-shell",
+      modern_section_heading(
+        "Покрытие MITRE",
+        "Как текущий набор инструментов покрывает тактики и техники",
+        "Ниже показан слой покрытия: сколько утилит реально связаны с MITRE, какие тактики плотнее всего заполнены и какие кандидаты стоит проверить следующими.",
+        class = "analytics-shell-heading"
+      ),
+      modern_summary_cards(modern_coverage_summary(tools_data, matrix_data)),
+      tags$article(
+        class = "glass-panel refinement-summary-panel",
+        tags$div(
+          class = "section-heading",
+          tags$div(
+            tags$div(class = "section-kicker-modern", "Очередь уточнения"),
+            tags$h3("Где слой уточнения нашёл дополнительные MITRE-возможности")
+          ),
+          tags$p("Этот слой показывает не подтверждённые связи, а самые правдоподобные кандидаты для ручной проверки или следующего прохода.")
+        ),
+        modern_summary_cards(modern_refinement_summary(refinement_data), class = "refinement-summary-grid")
+      ),
+      tags$div(
+        class = "analytics-grid",
+        tags$article(
+          class = "glass-panel chart-card",
+          modern_section_heading("Покрытие", "Нагрузка по тактикам MITRE"),
+          plotOutput("tactic_plot", height = 360)
+        ),
+        tags$article(
+          class = "glass-panel chart-card",
+          modern_section_heading("Кандидаты уточнения", "Какие техники чаще всплывают как новые кандидаты"),
+          plotOutput("mitre_refinement_plot", height = 360)
+        ),
+        tags$article(
+          class = "glass-panel chart-card chart-card-wide mitre-heatmap-panel",
+          modern_section_heading("Тепловая карта MITRE", "Компактный вид матрицы тактик и техник"),
+          plotOutput("heatmap_plot", height = 680)
+        ),
+        tags$article(
+          class = "glass-panel chart-card chart-card-wide",
+          modern_section_heading("Матрица", "Технические строки MITRE"),
+          DT::dataTableOutput("matrix_table")
+        ),
+        tags$article(
+          class = "glass-panel chart-card chart-card-wide",
+          modern_section_heading("Очередь проверки", "Новые MITRE-кандидаты"),
+          DT::dataTableOutput("mitre_refinement_table")
+        )
+      )
+    )
+  })
+
+  output$tool_list_count <- shiny::renderUI({
+    tags$h3(sprintf("Показано: %s", nrow(filtered_tools())))
+  })
+
+  output$tool_list_cards <- shiny::renderUI({
+    current_tool <- selected_tool()
+    current_id <- if (nrow(current_tool) > 0) as.character(current_tool$record_id[[1]]) else NULL
+    tool_list_cards(filtered_tools(), current_id)
+  })
+
+  output$tool_detail_panel <- shiny::renderUI({
+    tool <- selected_tool()
+
+    if (nrow(tool) == 0) {
+      return(tags$div(class = "empty-detail", "Нет данных для текущих фильтров."))
+    }
+
+    selected_matrix <- selected_tool_matrix()
+    selected_refinement <- selected_tool_refinement()
+    selected_ttp_groups <- build_selected_ttp_groups(selected_matrix)
+    selected_display_tags <- clean_display_tags(row_value(tool, "filter_tags"))
+    tool_name <- format_meta_value(row_value(tool, "assessed_name"))
+    tool_url <- format_meta_value(row_value(tool, "url"), fallback = "#")
+
+    tags$div(
+      tags$div(
+        class = "panel-heading-row",
+        tags$div(
+          tags$div(class = "section-kicker-modern", "Профиль инструмента"),
+          tags$h3(tool_name)
+        ),
+        tags$a(
+          class = "detail-link",
+          href = tool_url,
+          target = "_blank",
+          rel = "noreferrer",
+          "Открыть источник",
+          tags$span(class = "detail-link-arrow", "->")
+        )
+      ),
+      tags$div(
+        class = "detail-stat-grid-modern",
+        tags$div(tags$span("Ранг"), tags$strong(rank_label(row_value(tool, "visualization_rank")))),
+        tags$div(tags$span("Уверенность"), tags$strong(format_score(row_value(tool, "confidence_score")))),
+        tags$div(tags$span("Источник"), tags$strong(format_meta_value(row_value(tool, "source")))),
+        tags$div(tags$span("Тип"), tags$strong(format_meta_value(row_value(tool, "entity_type"))))
+      ),
+      tags$div(
+        class = "detail-copy-grid",
+        tags$article(
+          tags$div(class = "detail-section-kicker", "Краткое описание"),
+          tags$p(format_meta_value(row_value(tool, "short_description_ru"), fallback = "Описание недоступно."))
+        ),
+        tags$article(
+          tags$div(class = "detail-section-kicker", "Контекст записи"),
+          tags$div(
+            class = "tool-context-grid",
+            tags$span(tags$strong("source"), format_meta_value(row_value(tool, "source"))),
+            tags$span(tags$strong("type"), format_meta_value(row_value(tool, "entity_type"))),
+            tags$span(tags$strong("category"), format_meta_value(row_value(tool, "category_ru"))),
+            tags$span(tags$strong("MITRE"), sprintf("%s связей", nrow(selected_matrix)))
+          ),
+          if (length(selected_display_tags) > 0) {
+            tags$div(
+              class = "tag-ribbon compact-tags readable-tags",
+              lapply(utils::head(selected_display_tags, 10), function(tag) tags$span(tag))
+            )
+          }
+        )
+      ),
+      tags$article(
+        class = "detail-longform",
+        tags$div(class = "detail-section-kicker", "Полное описание"),
+        tags$p(format_meta_value(row_value(tool, "long_description_ru"), fallback = "Полное описание недоступно."))
+      ),
+      tags$section(
+        class = "matrix-section-modern ttp-map-section",
+        tags$div(
+          class = "panel-heading-row minor-heading",
+          tags$div(
+            tags$div(class = "detail-section-kicker", "MITRE-связи инструмента"),
+            tags$h4("Карта связей: инструмент -> тактики -> техники")
+          ),
+          tags$span(
+            class = "panel-chip",
+            sprintf("%s тактик · %s техник", length(selected_ttp_groups), nrow(selected_matrix))
+          )
+        ),
+        if (length(selected_ttp_groups) > 0) {
+          tags$div(
+            class = "ttp-map-layout",
+            tags$div(
+              class = "ttp-overview-band",
+              tags$div(
+                class = "ttp-tool-node",
+                tags$span("Инструмент"),
+                tags$strong(tool_name),
+                tags$em(format_meta_value(row_value(tool, "category_ru")))
+              ),
+              tags$div(class = "ttp-overview-arrow", "->"),
+              tags$div(
+                class = "ttp-overview-stat",
+                tags$strong(length(selected_ttp_groups)),
+                tags$span("тактик")
+              ),
+              tags$div(class = "ttp-overview-arrow", "->"),
+              tags$div(
+                class = "ttp-overview-stat",
+                tags$strong(nrow(selected_matrix)),
+                tags$span("техник")
+              )
+            ),
+            tags$div(
+              class = "ttp-tactic-stack",
+              lapply(seq_along(selected_ttp_groups), function(group_index) {
+                group <- selected_ttp_groups[[group_index]]
+                accent <- modern_accent_palette[((group_index - 1) %% length(modern_accent_palette)) + 1]
+
+                tags$article(
+                  class = "ttp-tactic-block",
+                  tags$div(
+                    class = "ttp-tactic-node",
+                    style = sprintf("--tactic-accent: %s;", accent),
+                    tags$div(class = "ttp-tactic-number", sprintf("%02d", group_index)),
+                    tags$div(
+                      tags$span("Тактика MITRE"),
+                      tags$h5(group$tactic),
+                      tags$p(group$description)
+                    ),
+                    tags$div(
+                      class = "ttp-tactic-metrics",
+                      tags$strong(length(group$techniques)),
+                      tags$span("техник"),
+                      tags$em(sprintf("средняя уверенность %s", format_score(group$avg_confidence)))
+                    )
+                  ),
+                  tags$div(class = "ttp-flow-divider", tags$span("Техники внутри тактики")),
+                  tags$div(
+                    class = "ttp-technique-grid",
+                    lapply(seq_along(group$techniques), function(row_index) {
+                      row <- group$techniques[[row_index]]
+                      reasoning <- format_meta_value(row_value(row, "reasoning_ru"), fallback = "")
+
+                      tags$div(
+                        class = "ttp-technique-card",
+                        tags$div(
+                          class = "ttp-technique-topline",
+                          tags$div(class = "ttp-technique-id", format_meta_value(row_value(row, "technique_id"))),
+                          tags$span(sprintf("Уверенность %s", format_score(row_value(row, "confidence"))))
+                        ),
+                        tags$h5(format_meta_value(row_value(row, "technique_name"))),
+                        tags$div(
+                          class = "ttp-technique-explain",
+                          tags$strong("Что делает"),
+                          tags$p(describe_technique(row))
+                        ),
+                        if (nzchar(reasoning)) {
+                          tags$div(
+                            class = "ttp-technique-explain is-reason",
+                            tags$strong("Почему связали"),
+                            tags$p(reasoning)
+                          )
+                        },
+                        tags$div(
+                          class = "ttp-technique-meta",
+                          tags$span(sprintf("source:%s", format_meta_value(row_value(row, "source")))),
+                          tags$span(format_meta_value(row_value(row, "category_ru")))
+                        )
+                      )
+                    })
+                  )
+                )
+              })
+            )
+          )
+        } else {
+          tags$div(class = "empty-detail mitre-empty", "Для этого инструмента MITRE-связи пока не рассчитаны.")
+        }
+      ),
+      tags$section(
+        class = "matrix-section-modern refinement-section-modern compact-review-section",
+        tags$div(
+          class = "panel-heading-row minor-heading",
+          tags$div(
+            tags$div(class = "detail-section-kicker", "Уточнение MITRE"),
+            tags$h4(sprintf("%s кандидатов на проверку", nrow(selected_refinement)))
+          )
+        ),
+        if (nrow(selected_refinement) > 0) {
+          tags$div(
+            class = "refinement-highlight-grid refinement-highlight-grid-detail",
+            lapply(seq_len(min(8, nrow(selected_refinement))), function(index) {
+              row <- selected_refinement[index, , drop = FALSE]
+              status_is_mapped <- isTRUE(row_value(row, "already_mapped", FALSE))
+              status_class <- if (status_is_mapped) " is-mapped" else ""
+              status_label <- if (status_is_mapped) "Уже в матрице" else "На проверку"
+              tactics <- split_mitre_values(row_value(row, "tactic_names"))
+              matched_terms <- split_mitre_values(row_value(row, "matched_terms"))
+
+              tags$article(
+                class = "refinement-highlight-card refinement-highlight-card-detail",
+                tags$div(
+                  class = "refinement-card-topline",
+                  tags$span(class = paste0("refinement-status-pill", status_class), status_label),
+                  tags$span(sprintf("%s оценка", format_score(row_value(row, "retrieval_score"))))
+                ),
+                tags$h4(sprintf(
+                  "%s · %s",
+                  format_meta_value(row_value(row, "technique_id")),
+                  format_meta_value(row_value(row, "technique_name"))
+                )),
+                tags$div(
+                  class = "refinement-meta-row",
+                  tags$span(sprintf("очередь #%s", format_meta_value(row_value(row, "retrieval_rank")))),
+                  tags$span(if (is.na(row_value(row, "mapped_confidence", NA_real_))) "новый кандидат" else sprintf("%s в матрице", format_score(row_value(row, "mapped_confidence"))))
+                ),
+                if (length(tactics) > 0) {
+                  tags$div(
+                    class = "tag-ribbon compact-tags refinement-tag-ribbon",
+                    lapply(utils::head(tactics, 4), function(tactic) tags$span(tactic))
+                  )
+                },
+                if (length(matched_terms) > 0) {
+                  tags$div(
+                    class = "refinement-token-row",
+                    lapply(utils::head(matched_terms, 6), function(term) tags$span(class = "refinement-token", term))
+                  )
+                }
+              )
+            })
+          )
+        } else {
+          tags$div(class = "empty-detail refinement-empty", "Для этой утилиты слой уточнения пока не нашёл дополнительных кандидатов.")
+        }
+      ),
+      tags$section(
+        class = "matrix-section-modern",
+        tags$div(
+          class = "panel-heading-row minor-heading",
+          tags$div(
+            tags$div(class = "detail-section-kicker", "Техническая таблица MITRE"),
+            tags$h4(sprintf("%s подтверждённых связей", nrow(selected_matrix)))
+          )
+        ),
+        if (nrow(selected_matrix) > 0) {
+          tags$div(
+            class = "matrix-table-modern",
+            tags$div(
+              class = "matrix-table-head",
+              tags$span("Техника"),
+              tags$span("Название"),
+              tags$span("Тактика"),
+              tags$span("Уверенность")
+            ),
+            tags$div(
+              class = "matrix-table-body",
+              lapply(seq_len(nrow(selected_matrix)), function(index) {
+                row <- selected_matrix[index, , drop = FALSE]
+
+                tags$div(
+                  class = "matrix-table-row",
+                  tags$span(format_meta_value(row_value(row, "technique_id"))),
+                  tags$span(format_meta_value(row_value(row, "technique_name"))),
+                  tags$span(format_meta_value(row_value(row, "tactic"))),
+                  tags$span(format_score(row_value(row, "confidence")))
+                )
+              })
+            )
+          )
+        } else {
+          tags$div(class = "empty-detail mitre-empty", "Подтверждённых MITRE-связей пока нет.")
+        }
+      )
+    )
   })
 
   output$overview_hero_panel <- shiny::renderUI({

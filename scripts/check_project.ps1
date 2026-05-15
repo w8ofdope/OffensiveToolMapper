@@ -1,6 +1,5 @@
 param(
   [switch]$SkipR,
-  [switch]$SkipWeb,
   [switch]$SkipDocker
 )
 
@@ -111,8 +110,8 @@ if (-not $SkipR) {
     Invoke-NativeCommand $rscript @("data-raw\run_tests.R")
   }
 
-  Invoke-CheckStep "webapp data export" {
-    Invoke-NativeCommand $rscript @("data-raw\export_webapp_data.R")
+  Invoke-CheckStep "Shiny app loads" {
+    Invoke-NativeCommand $rscript @("-e", "e <- new.env(parent = globalenv()); sys.source('inst/shiny/app.R', envir = e); stopifnot(is.function(e`$app_server)); stopifnot(inherits(e`$app_ui, 'shiny.tag') || inherits(e`$app_ui, 'shiny.tag.list'))")
   }
 
   $testArtifacts = Resolve-Path -LiteralPath "tests\testthat\inst" -ErrorAction SilentlyContinue
@@ -120,26 +119,6 @@ if (-not $SkipR) {
     $targetPath = $testArtifacts.Path
     if ($targetPath.StartsWith($repoRoot.Path, [System.StringComparison]::OrdinalIgnoreCase)) {
       Remove-Item -LiteralPath $targetPath -Recurse -Force
-    }
-  }
-}
-
-if (-not $SkipWeb) {
-  Invoke-CheckStep "npm audit" {
-    Push-Location -LiteralPath (Join-Path $repoRoot "webapp")
-    try {
-      Invoke-NativeCommand "npm" @("audit")
-    } finally {
-      Pop-Location
-    }
-  }
-
-  Invoke-CheckStep "webapp build" {
-    Push-Location -LiteralPath (Join-Path $repoRoot "webapp")
-    try {
-      Invoke-NativeCommand "npm" @("run", "build")
-    } finally {
-      Pop-Location
     }
   }
 }

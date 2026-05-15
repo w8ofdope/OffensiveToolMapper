@@ -13,87 +13,53 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 # Общая схема
 
-Pipeline организован так, чтобы каждая стадия могла запускаться отдельно и сохранять
-результат в `inst/extdata/`.
+Пайплайн можно запускать целиком или с нужной стадии через `run_pipeline_from()`. Все основные артефакты сохраняются в `inst/extdata/`, после чего их читает Shiny-приложение и MCP-сервер.
 
 Основные стадии:
 
-1. raw ETL;
-2. normalize;
-3. assessment;
-4. refine_mitre;
-5. visualize;
-6. export_webapp.
+1. сбор данных;
+2. нормализация;
+3. проверка релевантности;
+4. LLM-оценка;
+5. уточнение MITRE-связей;
+6. подготовка данных для визуализации.
 
-# Raw ETL
+# Сбор данных
 
-Источник данных состоит из трёх каналов:
+Источники данных:
 
-- GitHub repositories;
-- PacketStorm feeds;
-- RSS/Atom feeds.
+- GitHub-репозитории;
+- PacketStorm;
+- RSS/Atom-ленты.
 
-Каждый raw-layer сохраняется отдельно и может быть переиспользован без повторного сбора.
+Каждый источник сохраняется отдельно, чтобы повторный запуск мог использовать уже собранные данные.
 
-# Normalize
+# Нормализация
 
-На стадии нормализации данные приводятся к единой схеме и проходят pre-LLM filtering.
+На этой стадии данные приводятся к общей схеме и проходят первичную фильтрацию. Отсекаются учебные материалы, заметки, шпаргалки, документационные репозитории и другие записи, которые не похожи на реальный инструмент.
 
-На этом этапе отсекаются:
+# LLM-оценка
 
-- documentation-like repositories;
-- markdown-only helper repos без executable artifacts;
-- cert-prep/manual/notes/cheatsheet content;
-- другие кандидаты, не похожие на реальный offensive tool.
+Оценка определяет релевантность, тип сущности, русское описание для интерфейса и MITRE ATT&CK-связи. Провайдер задается переменными окружения: можно использовать OpenAI-совместимый режим или DeepSeek.
 
-# Unified assessment
+# Уточнение MITRE
 
-Primary-path для MVP теперь строится через один LLM-вызов, который сразу возвращает:
+Дополнительный слой подбирает возможные техники через поиск по MITRE-описаниям. Он не заменяет LLM-оценку, а дает кандидатов для проверки и улучшения связей.
 
-- релевантность;
-- тип сущности;
-- русские описания для UI;
-- MITRE mappings.
+# Визуализация
 
-Результаты пишутся как в RDS-артефакты, так и в DuckDB supplemental storage.
+Стадия визуализации формирует два основных набора:
 
-# MITRE refinement
+- `visualization_tools.rds` — карточки инструментов, описания, теги, источники и сводные поля;
+- `visualization_tool_matrix.rds` — связи инструментов с тактиками и техниками MITRE.
 
-Поверх основного MITRE mapping работает retrieval-first refinement слой.
-
-Он не заменяет основной assessment, а строит candidate suggestions для дальнейшей
-ручной проверки или следующего этапа валидации.
-
-# Visualization
-
-Visualization layer строит два основных датасета:
-
-- `visualization_tools.rds` для UI карточек и explorer-представления;
-- `visualization_tool_matrix.rds` для MITRE heatmap, tactic/technique filters и аналитики.
-
-# Web export
-
-Для modern UI формируются JSON-файлы:
-
-- `tools.json`;
-- `matrix.json`;
-- `refinement.json`;
-- `summary.json`.
-
-# Resume-path
-
-Оркестратор поддерживает частичный рестарт с нужной стадии через `run_pipeline_from()`.
-Это позволяет:
-
-- не повторять raw ETL без необходимости;
-- быстро перепроверять только assessment/refinement/export;
-- сохранять stage status в `pipeline_status.rds` и `pipeline_status.json`.
+Эти файлы являются единым источником данных для Shiny-приложения и MCP-сервера.
 
 # Проверка состояния
 
-Минимальный operational checklist после крупного изменения:
+Минимальный чеклист после изменений:
 
-1. прогнать `data-raw/run_tests.R`;
+1. запустить `data-raw/run_tests.R`;
 2. при необходимости прогнать `data-raw/run_full_pipeline.R`;
-3. проверить `inst/extdata/pipeline_status.json`;
-4. убедиться, что `webapp/public/data/` обновлён.
+3. открыть Shiny-приложение и проверить вкладки `Обзор`, `Инструменты`, `Аналитика`, `Пайплайн`;
+4. убедиться, что MCP-сервер читает свежие данные из `inst/extdata/`.

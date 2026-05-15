@@ -13,7 +13,6 @@ source(file.path(project_root, "R", "storage_duckdb.R"))
 source(file.path(project_root, "R", "llm_assessment.R"))
 source(file.path(project_root, "R", "visualization_data.R"))
 source(file.path(project_root, "R", "rag_refinement.R"))
-source(file.path(project_root, "R", "webapp_export.R"))
 source(file.path(project_root, "R", "pipeline.R"))
 
 data_dir <- file.path(project_root, "inst", "extdata")
@@ -98,9 +97,7 @@ result <- run_full_pipeline(
   github_max_results = github_max_results,
   github_max_search_requests = github_max_search_requests,
   run_mitre_refinement = TRUE,
-  mitre_attack_path = file.path(project_root, "data", "mitre_attack.rda"),
-  export_webapp = TRUE,
-  webapp_data_dir = file.path(project_root, "webapp", "public", "data")
+  mitre_attack_path = file.path(project_root, "data", "mitre_attack.rda")
 )
 
 status_table <- result$pipeline_status
