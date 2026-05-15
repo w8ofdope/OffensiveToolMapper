@@ -3024,29 +3024,29 @@ app_server <- function(input, output, session) {
 
     tags$div(
       class = "metric-grid pipeline-metric-grid",
-      metric_card("Normalized", snapshot$metrics$normalized %||% "n/a", "Кандидаты после canonical normalization"),
-      metric_card("Assessed", snapshot$metrics$assessed %||% "n/a", "Все rows unified LLM assessment"),
-      metric_card("Relevant", snapshot$metrics$relevant %||% "n/a", "Инструменты, прошедшие relevance gate"),
-      metric_card("Discovery new", snapshot$metrics$discovery_new_rows %||% "n/a", "Новые raw rows из последнего collect stage"),
-      metric_card("GitHub new", snapshot$metrics$github_new_rows %||% "n/a", "Новые GitHub rows за последний incremental run"),
-      metric_card("LLM candidates", snapshot$metrics$llm_candidates %||% "n/a", "Rows, которые должны идти в LLM после pre-filter"),
-      metric_card("LLM backlog", snapshot$metrics$llm_backlog %||% "n/a", "Еще не обработано или требует retry"),
-      metric_card("LLM errors", snapshot$metrics$llm_errors %||% "n/a", "Последние assessment rows с ошибкой"),
-      metric_card("MITRE rows", snapshot$metrics$matrix %||% "n/a", "Связи tool -> tactic / technique"),
-      metric_card("UI history", snapshot$metrics$ui_history %||% "n/a", "Все когда-либо добавленные в UI инструменты"),
-      metric_card("GitHub slice", snapshot$metrics$github_selected_requests %||% "n/a", "Сколько request slots взял текущий run"),
-      metric_card("Query offset", snapshot$metrics$github_request_offset %||% "n/a", "С какого offset начался последний GitHub slice"),
-      metric_card("Next offset", snapshot$metrics$github_next_request_offset %||% "n/a", "Куда сдвинется следующий GitHub run"),
-      metric_card("Plan size", snapshot$metrics$github_query_plan_size %||% "n/a", "Полный размер текущего GitHub query plan"),
-      metric_card("Slice share", if (is.na(snapshot$metrics$github_selection_share_percent)) "n/a" else sprintf("%.1f%%", snapshot$metrics$github_selection_share_percent), "Какая доля query plan берётся за один запуск"),
-      metric_card("Plan progress", if (is.na(snapshot$metrics$github_rotation_progress_percent)) "n/a" else sprintf("%.1f%%", snapshot$metrics$github_rotation_progress_percent), "Насколько далеко сдвинулся incremental rotation"),
-      metric_card("Logged requests", snapshot$metrics$github_logged_requests %||% "n/a", "Сколько GitHub search requests реально ушло в последнем run"),
-      metric_card("Coverage runs", snapshot$metrics$estimated_full_coverage_runs %||% "n/a", "Примерно сколько запусков нужно, чтобы пройти весь plan один раз"),
-      metric_card("Runs left", snapshot$metrics$github_remaining_runs_estimate %||% "n/a", "Сколько запусков примерно осталось до конца текущего обхода"),
-      metric_card("Sanity fails", snapshot$metrics$sanity_failed_checks %||% "n/a", "Критические post-run sanity check failures"),
-      metric_card("Sanity warns", snapshot$metrics$sanity_warning_checks %||% "n/a", "Предупреждения post-run sanity layer"),
-      metric_card("Unique tactics", snapshot$metrics$unique_tactics %||% "n/a", "Разные tactics в visualization matrix"),
-      metric_card("Unique techniques", snapshot$metrics$unique_techniques %||% "n/a", "Разные MITRE technique_id" )
+      metric_card("Нормализовано", snapshot$metrics$normalized %||% "n/a", "Инструменты после нормализации и дедупликации"),
+      metric_card("Оценено", snapshot$metrics$assessed %||% "n/a", "Инструменты, прошедшие оценку нейросетью"),
+      metric_card("Релевантных", snapshot$metrics$relevant %||% "n/a", "Инструменты, признанные релевантными"),
+      metric_card("Новых найдено", snapshot$metrics$discovery_new_rows %||% "n/a", "Новые записи из последнего сбора данных"),
+      metric_card("Новых с GitHub", snapshot$metrics$github_new_rows %||% "n/a", "Новые репозитории GitHub за последний запуск"),
+      metric_card("Кандидатов для оценки", snapshot$metrics$llm_candidates %||% "n/a", "Инструменты, отправленные на оценку нейросетью"),
+      metric_card("В очереди", snapshot$metrics$llm_backlog %||% "n/a", "Ещё не обработано или требует повтора"),
+      metric_card("Ошибок оценки", snapshot$metrics$llm_errors %||% "n/a", "Записи с ошибкой при оценке нейросетью"),
+      metric_card("Записей MITRE", snapshot$metrics$matrix %||% "n/a", "Связи инструмент — тактика / техника"),
+      metric_card("Добавлено в интерфейс", snapshot$metrics$ui_history %||% "n/a", "Все инструменты, когда-либо показанные в интерфейсе"),
+      metric_card("Запросов в срезе", snapshot$metrics$github_selected_requests %||% "n/a", "Число поисковых запросов в текущем срезе"),
+      metric_card("Смещение запросов", snapshot$metrics$github_request_offset %||% "n/a", "Смещение, с которого начался последний запуск"),
+      metric_card("Следующее смещение", snapshot$metrics$github_next_request_offset %||% "n/a", "Смещение для следующего запуска"),
+      metric_card("Размер плана", snapshot$metrics$github_query_plan_size %||% "n/a", "Общий размер плана поисковых запросов"),
+      metric_card("Доля среза", if (is.na(snapshot$metrics$github_selection_share_percent)) "n/a" else sprintf("%.1f%%", snapshot$metrics$github_selection_share_percent), "Доля плана, охватываемая за один запуск"),
+      metric_card("Прогресс обхода", if (is.na(snapshot$metrics$github_rotation_progress_percent)) "n/a" else sprintf("%.1f%%", snapshot$metrics$github_rotation_progress_percent), "Прогресс инкрементального обхода плана запросов"),
+      metric_card("Отправлено запросов", snapshot$metrics$github_logged_requests %||% "n/a", "Реально отправлено поисковых запросов в последнем запуске"),
+      metric_card("Запусков для покрытия", snapshot$metrics$estimated_full_coverage_runs %||% "n/a", "Оценочное число запусков для полного обхода плана"),
+      metric_card("Осталось запусков", snapshot$metrics$github_remaining_runs_estimate %||% "n/a", "Осталось запусков до конца текущего обхода"),
+      metric_card("Критических ошибок", snapshot$metrics$sanity_failed_checks %||% "n/a", "Критические проверки, не прошедшие после запуска"),
+      metric_card("Предупреждений", snapshot$metrics$sanity_warning_checks %||% "n/a", "Предупреждения, возникшие после запуска"),
+      metric_card("Уникальных тактик", snapshot$metrics$unique_tactics %||% "n/a", "Уникальные тактики в матрице визуализации"),
+      metric_card("Уникальных техник", snapshot$metrics$unique_techniques %||% "n/a", "Уникальные техники MITRE в матрице визуализации")
     )
   })
 
@@ -3059,15 +3059,15 @@ app_server <- function(input, output, session) {
 
     tags$div(
       class = "metric-grid pipeline-compare-metric-grid",
-      metric_card("Current run", input$pipeline_compare_current_run %||% "n/a", summary_lookup[["status"]] %||% "status is not available"),
-      metric_card("Baseline run", input$pipeline_compare_baseline_run %||% "n/a", if (is.data.frame(summary) && nrow(summary) > 0) summary$baseline[summary$metric == "status"][[1]] %||% "status is not available" else "status is not available"),
-      metric_card("New tools", if (is.data.frame(tool_diff)) sum(tool_diff$change_type == "new", na.rm = TRUE) else 0L, "Relevant tools, которых не было в baseline run"),
-      metric_card("Changed tools", if (is.data.frame(tool_diff)) sum(tool_diff$change_type == "changed", na.rm = TRUE) else 0L, "Те же record_id, но с изменёнными core fields"),
-      metric_card("Removed tools", if (is.data.frame(tool_diff)) sum(tool_diff$change_type == "removed", na.rm = TRUE) else 0L, "Были в baseline run, но отсутствуют сейчас"),
-      metric_card("New MITRE", if (is.data.frame(mitre_diff)) sum(mitre_diff$change_type == "new", na.rm = TRUE) else 0L, "Новые MITRE mappings по сравнению с baseline run"),
-      metric_card("Changed MITRE", if (is.data.frame(mitre_diff)) sum(mitre_diff$change_type == "changed", na.rm = TRUE) else 0L, "Те же mappings, но с другим confidence/reasoning"),
-      metric_card("Removed MITRE", if (is.data.frame(mitre_diff)) sum(mitre_diff$change_type == "removed", na.rm = TRUE) else 0L, "MITRE mappings, пропавшие в current run"),
-      metric_card("MITRE delta", if (is.data.frame(summary) && any(summary$metric == "mitre_rows")) summary$delta[summary$metric == "mitre_rows"][[1]] else "n/a", "Изменение общего числа MITRE mapping rows")
+      metric_card("Текущий запуск", input$pipeline_compare_current_run %||% "n/a", summary_lookup[["status"]] %||% "статус недоступен"),
+      metric_card("Базовый запуск", input$pipeline_compare_baseline_run %||% "n/a", if (is.data.frame(summary) && nrow(summary) > 0) summary$baseline[summary$metric == "status"][[1]] %||% "статус недоступен" else "статус недоступен"),
+      metric_card("Новых инструментов", if (is.data.frame(tool_diff)) sum(tool_diff$change_type == "new", na.rm = TRUE) else 0L, "Инструменты, которых не было в базовом запуске"),
+      metric_card("Изменённых инструментов", if (is.data.frame(tool_diff)) sum(tool_diff$change_type == "changed", na.rm = TRUE) else 0L, "Те же инструменты, но с изменёнными данными"),
+      metric_card("Удалённых инструментов", if (is.data.frame(tool_diff)) sum(tool_diff$change_type == "removed", na.rm = TRUE) else 0L, "Инструменты, пропавшие по сравнению с базовым запуском"),
+      metric_card("Новых MITRE-связей", if (is.data.frame(mitre_diff)) sum(mitre_diff$change_type == "new", na.rm = TRUE) else 0L, "Новые MITRE-маппинги по сравнению с базовым запуском"),
+      metric_card("Изменённых MITRE-связей", if (is.data.frame(mitre_diff)) sum(mitre_diff$change_type == "changed", na.rm = TRUE) else 0L, "Те же маппинги с изменёнными данными"),
+      metric_card("Удалённых MITRE-связей", if (is.data.frame(mitre_diff)) sum(mitre_diff$change_type == "removed", na.rm = TRUE) else 0L, "Маппинги, пропавшие в текущем запуске"),
+      metric_card("Изменение MITRE", if (is.data.frame(summary) && any(summary$metric == "mitre_rows")) summary$delta[summary$metric == "mitre_rows"][[1]] else "n/a", "Изменение общего числа MITRE-маппингов")
     )
   })
 

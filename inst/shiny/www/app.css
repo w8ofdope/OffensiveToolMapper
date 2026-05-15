@@ -409,6 +409,14 @@ body::before {
   margin-bottom: 0;
 }
 
+.pipeline-toolbar .section-intro h2 {
+  color: #1a202c;
+}
+
+.pipeline-toolbar .section-intro p {
+  color: #2d3748;
+}
+
 .pipeline-refresh-button {
   min-width: 170px;
   min-height: 46px;
