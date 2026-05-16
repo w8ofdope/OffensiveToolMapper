@@ -183,8 +183,6 @@ if (-not $GithubPat)            { $GithubPat            = Get-EnvValue "GITHUB_P
 if (-not $OpenAiOrgId)          { $OpenAiOrgId          = Get-EnvValue "OPENAI_ORG_ID"            }
 if (-not $OpenAiProjectId)      { $OpenAiProjectId      = Get-EnvValue "OPENAI_PROJECT_ID"        }
 if (-not $LlmBaseUrl)           { $LlmBaseUrl           = Get-EnvValue "LLM_BASE_URL"             }
-if (-not $LlmMaxRecords)        { $LlmMaxRecords        = Get-EnvValue "LLM_MAX_RECORDS"          }
-if (-not $GithubMaxResults)     { $GithubMaxResults     = Get-EnvValue "OTM_GITHUB_MAX_RESULTS"  }
 if (-not $RssFeeds)             { $RssFeeds             = Get-EnvValue "OTM_RSS_FEEDS"            }
 if (-not $PacketStormApiSecret) { $PacketStormApiSecret = Get-EnvValue "PACKETSTORM_API_SECRET"   }
 if (-not $PacketStormUrls)      { $PacketStormUrls      = Get-EnvValue "PACKETSTORM_URLS"         }
@@ -222,7 +220,7 @@ if (-not $NonInteractive) {
 
   Write-SetupStep "6. Run limits" "LLM_MAX_RECORDS is empty by default, which means no LLM record limit."
   $LlmMaxRecords = Read-PlainValue "LLM_MAX_RECORDS (optional; leave empty = no limit)" $LlmMaxRecords
-  $githubResultsDefault = if ($GithubMaxResults) { $GithubMaxResults } else { "100" }
+  $githubResultsDefault = "100"
   $GithubMaxResults = Read-PlainValue "OTM_GITHUB_MAX_RESULTS" $githubResultsDefault
   $githubRequestDefault = "1"
   $GithubMaxSearchRequests = Read-PlainValue "OTM_GITHUB_MAX_SEARCH_REQUESTS" $githubRequestDefault
