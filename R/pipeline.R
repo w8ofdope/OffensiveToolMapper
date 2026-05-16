@@ -464,6 +464,21 @@ if (getRversion() >= "2.15.1") {
 
   failures <- sum(checks$status == "fail", na.rm = TRUE)
   warnings <- sum(checks$status == "warn", na.rm = TRUE)
+  passed <- sum(checks$status == "pass", na.rm = TRUE)
+  summary_message <- sprintf(
+    "Pipeline sanity checks summary: passed=%s warnings=%s failures=%s. %s",
+    passed,
+    warnings,
+    failures,
+    if (failures > 0L) {
+      sprintf("Critical issues were found; inspect %s.", output_path)
+    } else if (warnings > 0L) {
+      sprintf("Warnings are non-fatal diagnostics; inspect %s for details.", output_path)
+    } else {
+      "All checks passed."
+    }
+  )
+  log_message(summary_message, level = if (failures > 0L) "ERROR" else "INFO")
 
   list(
     state = list(pipeline_sanity_checks = checks),
