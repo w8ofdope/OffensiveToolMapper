@@ -3546,7 +3546,7 @@ app_server <- function(input, output, session) {
       shiny::numericInput(
         "modal_max_records",
         "Лимит записей LLM (0 = без лимита)",
-        value = as.integer(get_runtime_env_value("LLM_MAX_RECORDS", unset = "0")),
+        value = 0L,
         min = 0L,
         step = 10L
       ),
