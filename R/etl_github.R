@@ -1029,7 +1029,7 @@ search_github_tools <- function(
   include_archived = FALSE,
   include_readme = TRUE,
   sort_modes = get_default_github_search_modes(),
-  max_search_requests = 60L,
+  max_search_requests = 1L,
   min_search_requests = 12L,
   token = NULL,
   search_log_path = NULL
@@ -1338,7 +1338,7 @@ collect_github_tools <- function(
   include_archived = FALSE,
   include_readme = TRUE,
   sort_modes = get_default_github_search_modes(),
-  max_search_requests = 60L,
+  max_search_requests = 1L,
   min_search_requests = 12L,
   token = NULL,
   search_log_path = file.path(get_default_data_dir(), "github_search_log.rds"),

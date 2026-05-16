@@ -24,7 +24,7 @@ collect_mode <- match.arg(
 )
 github_min_stars <- as.integer(get_runtime_env_value("OTM_GITHUB_MIN_STARS", unset = "0"))
 github_max_results <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_RESULTS", unset = "100"))
-github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "60"))
+github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "1"))
 
 log_message(sprintf(
   "Full pipeline preflight: provider=%s model=%s base_url=%s api_key_present=%s max_records=%s collect_mode=%s github_min_stars=%s github_max_results=%s github_max_search_requests=%s",

@@ -9,7 +9,7 @@
 ##   GITHUB_PAT                GitHub token (recommended)
 ##   OTM_GITHUB_MIN_STARS      default 0
 ##   OTM_GITHUB_MAX_RESULTS    default 100
-##   OTM_GITHUB_MAX_SEARCH_REQUESTS  default 60
+##   OTM_GITHUB_MAX_SEARCH_REQUESTS  default 1
 ##   OTM_RSS_FEEDS             leave empty = 3 default feeds, or semicolon-separated URLs, or "disabled"
 ##   PACKETSTORM_API_SECRET    PacketStorm API key (optional)
 ##   PACKETSTORM_URLS          semicolon-separated PacketStorm page URLs (optional, no key needed)
@@ -37,7 +37,7 @@ collect_mode <- match.arg(
 )
 github_min_stars          <- as.integer(get_runtime_env_value("OTM_GITHUB_MIN_STARS",          unset = "0"))
 github_max_results        <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_RESULTS",        unset = "100"))
-github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "60"))
+github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "1"))
 
 rss_feeds <- get_default_feeds()
 rss_label <- if (length(rss_feeds) == 0) "disabled" else paste(length(rss_feeds), "feeds")

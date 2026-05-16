@@ -77,9 +77,9 @@ DEEPSEEK_API_KEY=sk-...
 GITHUB_PAT=github_pat_...
 
 # Лимиты для быстрой проверки
-LLM_MAX_RECORDS=5
-OTM_GITHUB_MAX_SEARCH_REQUESTS=3
-OTM_GITHUB_MAX_RESULTS=20
+LLM_MAX_RECORDS=
+OTM_GITHUB_MAX_SEARCH_REQUESTS=1
+OTM_GITHUB_MAX_RESULTS=100
 OTM_RSS_FEEDS=disabled
 ```
 
@@ -270,7 +270,7 @@ docker compose down
 ```env
 OTM_GITHUB_MIN_STARS=0
 OTM_GITHUB_MAX_RESULTS=100
-OTM_GITHUB_MAX_SEARCH_REQUESTS=60
+OTM_GITHUB_MAX_SEARCH_REQUESTS=1
 ```
 
 `OTM_GITHUB_MAX_SEARCH_REQUESTS` ограничивает расход GitHub API: один search-запрос = один запрос к `/search/repositories` для конкретного query/sort/page. `OTM_GITHUB_MAX_RESULTS` ограничивает уже итоговый набор уникальных репозиториев после объединения и дедупликации ответов.
@@ -332,9 +332,9 @@ Rscript data-raw/run_full_pipeline.R
 Для короткого прогона задай в `.env`:
 
 ```env
-LLM_MAX_RECORDS=5
-OTM_GITHUB_MAX_SEARCH_REQUESTS=3
-OTM_GITHUB_MAX_RESULTS=20
+LLM_MAX_RECORDS=
+OTM_GITHUB_MAX_SEARCH_REQUESTS=1
+OTM_GITHUB_MAX_RESULTS=100
 OTM_RSS_FEEDS=disabled
 ```
 

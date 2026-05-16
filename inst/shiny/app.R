@@ -3613,7 +3613,7 @@ app_server <- function(input, output, session) {
       '}',
       'github_min_stars <- as.integer(get_runtime_env_value("OTM_GITHUB_MIN_STARS", unset = "0"))',
       'github_max_results <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_RESULTS", unset = "100"))',
-      'github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "60"))',
+      'github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "1"))',
       'log_message(sprintf("Shiny pipeline GitHub limits: min_stars=%s max_results=%s max_search_requests=%s", github_min_stars, github_max_results, github_max_search_requests))',
       sprintf('runtime_cfg <- get_llm_runtime_config("%s")', provider),
       sprintf('for (i in seq_len(%sL)) {', batch_count),
