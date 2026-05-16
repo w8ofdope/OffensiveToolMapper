@@ -83,6 +83,8 @@ OTM_GITHUB_MAX_RESULTS=30
 OTM_RSS_FEEDS=disabled
 ```
 
+Такой профиль удобен для быстрой проверки: GitHub делает один search-запрос (`GitHub request 1/1`), сохраняет до 30 уникальных репозиториев, затем normalize/pre-filter отбирает кандидатов для LLM. `LLM_MAX_RECORDS=` оставлен пустым, поэтому искусственного лимита LLM нет; фактическое число LLM-запросов зависит от того, сколько кандидатов пройдет фильтр.
+
 > Вместо DeepSeek подойдёт любой дешёвый провайдер: `groq` (llama-3.3-70b-versatile — бесплатный тариф), `mistral` (mistral-small-latest).
 
 Запуск через CLI:
