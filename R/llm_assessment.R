@@ -492,12 +492,13 @@ run_unified_tool_assessment <- function(
 
   log_message(sprintf("Assessment runtime: provider=%s model=%s base_url=%s api_key_present=%s", provider, model, base_url, nzchar(api_key)))
   log_message(sprintf(
-    "Assessment queue: total_inputs=%s reused_success=%s pending=%s llm_candidates=%s skipped_pre_filter=%s",
+    "Assessment queue: total_inputs=%s reused_success=%s pending=%s llm_candidates=%s skipped_pre_filter=%s max_records=%s",
     nrow(inputs),
     length(reusable_success_ids),
     nrow(pending_inputs),
     nrow(candidates),
-    nrow(skipped_inputs)
+    nrow(skipped_inputs),
+    ifelse(is.null(max_records), "all", as.character(max_records))
   ))
 
   assessment_rows <- list()
