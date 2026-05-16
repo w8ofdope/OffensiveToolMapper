@@ -138,17 +138,17 @@ if ((Test-Path -LiteralPath $OutputPath) -and -not $Force -and $NonInteractive) 
   throw "$OutputPath already exists. Pass -Force to overwrite."
 }
 
+$EnvProvider = Get-EnvValue "LLM_PROVIDER"
+
 if (-not $NonInteractive) { Write-SetupHeader }
 
-if (-not $Provider) { $Provider = Get-EnvValue "LLM_PROVIDER" }
-
 if (-not $Provider) {
-  if ($NonInteractive) {
-    $Provider = "openai"
-  } else {
-    Write-SetupStep "1. LLM provider" "Choose the AI provider. openai=ChatGPT, anthropic=Claude, deepseek=DeepSeek, xai=Grok, groq=Groq, mistral=Mistral, ollama=local Ollama."
-    $Provider = Read-PlainValue "LLM_PROVIDER (provider name, not an API key)" "openai"
-  }
+  $Provider = if ($EnvProvider) { $EnvProvider } else { "openai" }
+}
+
+if (-not $NonInteractive) {
+  Write-SetupStep "1. LLM provider" "Choose the AI provider. openai=ChatGPT, anthropic=Claude, deepseek=DeepSeek, xai=Grok, groq=Groq, mistral=Mistral, ollama=local Ollama."
+  $Provider = Read-PlainValue "LLM_PROVIDER (provider name, not an API key)" $Provider
 }
 
 $Provider = $Provider.Trim().Trim('"').Trim("'").ToLowerInvariant()
@@ -160,7 +160,12 @@ if ($Provider -notin $SupportedProviders) {
   throw "LLM_PROVIDER must be one of: $($SupportedProviders -join ', ')."
 }
 
-if (-not $Model) { $Model = Get-EnvValue "LLM_MODEL" }
+if (-not $Model) {
+  $EnvModel = Get-EnvValue "LLM_MODEL"
+  if ($EnvModel -and $EnvProvider -and ($Provider -eq $EnvProvider.Trim().Trim('"').Trim("'").ToLowerInvariant())) {
+    $Model = $EnvModel
+  }
+}
 if (-not $Model) { $Model = Get-DefaultModel $Provider }
 
 if (-not $NonInteractive) {
