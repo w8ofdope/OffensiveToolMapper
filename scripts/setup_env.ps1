@@ -216,8 +216,8 @@ if (-not $NonInteractive) {
   $OpenAiProjectId = Read-PlainValue "OPENAI_PROJECT_ID (optional)"                $OpenAiProjectId
   $LlmBaseUrl      = Read-PlainValue "LLM_BASE_URL (optional, custom endpoint)"    $LlmBaseUrl
 
-  Write-SetupStep "6. Run limits" "LLM_MAX_RECORDS limits paid LLM calls for a test run."
-  $LlmMaxRecords = Read-PlainValue "LLM_MAX_RECORDS (optional, example: 20)" $LlmMaxRecords
+  Write-SetupStep "6. Run limits" "LLM_MAX_RECORDS is empty by default, which means no LLM record limit."
+  $LlmMaxRecords = Read-PlainValue "LLM_MAX_RECORDS (optional; leave empty = no limit)" $LlmMaxRecords
   $githubResultsDefault = if ($GithubMaxResults) { $GithubMaxResults } else { "100" }
   $GithubMaxResults = Read-PlainValue "OTM_GITHUB_MAX_RESULTS" $githubResultsDefault
   $githubRequestDefault = if ($GithubMaxSearchRequests) { $GithubMaxSearchRequests } else { "60" }
