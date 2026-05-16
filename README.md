@@ -275,6 +275,8 @@ OTM_GITHUB_MAX_SEARCH_REQUESTS=1
 
 `OTM_GITHUB_MAX_SEARCH_REQUESTS` ограничивает расход GitHub API: один search-запрос = один запрос к `/search/repositories` для конкретного query/sort/page. `OTM_GITHUB_MAX_RESULTS` ограничивает уже итоговый набор уникальных репозиториев после объединения и дедупликации ответов.
 
+Пример: при `OTM_GITHUB_MAX_SEARCH_REQUESTS=1` и `OTM_GITHUB_MAX_RESULTS=30` в логе должно быть `GitHub request 1/1`. GitHub может вернуть больше репозиториев, но пайплайн сохранит максимум 30 уникальных, затем пропустит их через normalize/pre-filter, и к LLM уйдут только кандидаты, которые прошли фильтр и ещё не были успешно обработаны раньше.
+
 ### RSS-ленты
 
 По умолчанию подключены три открытых ленты безопасности:
