@@ -1055,7 +1055,7 @@ run_pipeline_from <- function(
   visualization_tool_matrix = NULL,
   github_queries = get_default_github_query_specs(),
   github_min_stars = 0L,
-  github_max_results = 100L,
+  github_max_results = 30L,
   github_max_search_requests = 1L,
   github_languages = NULL,
   github_include_archived = FALSE,

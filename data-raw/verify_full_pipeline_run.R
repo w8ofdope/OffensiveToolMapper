@@ -72,7 +72,7 @@ collect_mode <- match.arg(
   choices = c("incremental", "snapshot")
 )
 github_min_stars <- as.integer(get_runtime_env_value("OTM_GITHUB_MIN_STARS", unset = "0"))
-github_max_results <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_RESULTS", unset = "100"))
+github_max_results <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_RESULTS", unset = "30"))
 github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "1"))
 
 log_message(sprintf(

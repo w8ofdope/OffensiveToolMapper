@@ -8,7 +8,7 @@
 ##   OTM_COLLECT_MODE          incremental (default) | snapshot
 ##   GITHUB_PAT                GitHub token (recommended)
 ##   OTM_GITHUB_MIN_STARS      default 0
-##   OTM_GITHUB_MAX_RESULTS    default 100
+##   OTM_GITHUB_MAX_RESULTS    default 30
 ##   OTM_GITHUB_MAX_SEARCH_REQUESTS  default 1
 ##   OTM_RSS_FEEDS             leave empty = 3 default feeds, or semicolon-separated URLs, or "disabled"
 ##   PACKETSTORM_API_SECRET    PacketStorm API key (optional)
@@ -36,7 +36,7 @@ collect_mode <- match.arg(
   choices = c("incremental", "snapshot")
 )
 github_min_stars          <- as.integer(get_runtime_env_value("OTM_GITHUB_MIN_STARS",          unset = "0"))
-github_max_results        <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_RESULTS",        unset = "100"))
+github_max_results        <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_RESULTS",        unset = "30"))
 github_max_search_requests <- as.integer(get_runtime_env_value("OTM_GITHUB_MAX_SEARCH_REQUESTS", unset = "1"))
 
 rss_feeds <- get_default_feeds()

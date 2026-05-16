@@ -220,7 +220,7 @@ if (-not $NonInteractive) {
 
   Write-SetupStep "6. Run limits" "LLM_MAX_RECORDS is empty by default, which means no LLM record limit."
   $LlmMaxRecords = Read-PlainValue "LLM_MAX_RECORDS (optional; leave empty = no limit)" $LlmMaxRecords
-  $githubResultsDefault = "100"
+  $githubResultsDefault = "30"
   $GithubMaxResults = Read-PlainValue "OTM_GITHUB_MAX_RESULTS" $githubResultsDefault
   $githubRequestDefault = "1"
   $GithubMaxSearchRequests = Read-PlainValue "OTM_GITHUB_MAX_SEARCH_REQUESTS" $githubRequestDefault
@@ -260,7 +260,7 @@ if (-not $GithubPat) {
   Write-Warning "GITHUB_PAT is empty: GitHub collection may hit API rate limits."
 }
 
-if (-not $GithubMaxResults) { $GithubMaxResults = "100" }
+if (-not $GithubMaxResults) { $GithubMaxResults = "30" }
 if (-not $GithubMaxSearchRequests) { $GithubMaxSearchRequests = "1" }
 if (-not $DockerImage) { $DockerImage = "ghcr.io/w8ofdope/offensive-tool-mapper:latest" }
 
