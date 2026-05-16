@@ -543,16 +543,17 @@ if (getRversion() >= "2.15.1") {
     ))
   }
 
-  selected_plan <- query_plan
+  request_limit <- min(nrow(query_plan), max(1L, as.integer(github_max_search_requests)))
+  selected_plan <- utils::head(query_plan, request_limit)
   start_offset <- 0L
   next_request_offset <- 0L
 
-  if (isTRUE(rotate_query_plan) && nrow(query_plan) > as.integer(github_max_search_requests)) {
+  if (isTRUE(rotate_query_plan) && nrow(query_plan) > request_limit) {
     state <- .pipeline_load_github_search_state(state_path)
     start_offset <- state$next_request_offset %||% 0L
-    selected_indexes <- ((start_offset + seq_len(as.integer(github_max_search_requests)) - 1L) %% nrow(query_plan)) + 1L
+    selected_indexes <- ((start_offset + seq_len(request_limit) - 1L) %% nrow(query_plan)) + 1L
     selected_plan <- query_plan[selected_indexes, , drop = FALSE]
-    next_request_offset <- (start_offset + as.integer(github_max_search_requests)) %% nrow(query_plan)
+    next_request_offset <- (start_offset + request_limit) %% nrow(query_plan)
   }
 
   selected_group_keys <- paste(
