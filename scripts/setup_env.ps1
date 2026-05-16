@@ -259,7 +259,7 @@ if (-not $GithubPat) {
 }
 
 if (-not $GithubMaxResults) { $GithubMaxResults = "100" }
-if (-not $GithubMaxSearchRequests) { $GithubMaxSearchRequests = "60" }
+if (-not $GithubMaxSearchRequests) { $GithubMaxSearchRequests = "1" }
 if (-not $DockerImage) { $DockerImage = "ghcr.io/w8ofdope/offensive-tool-mapper:latest" }
 
 $lines = [System.Collections.Generic.List[string]]::new()
