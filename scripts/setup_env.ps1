@@ -180,7 +180,6 @@ if (-not $OpenAiProjectId)      { $OpenAiProjectId      = Get-EnvValue "OPENAI_P
 if (-not $LlmBaseUrl)           { $LlmBaseUrl           = Get-EnvValue "LLM_BASE_URL"             }
 if (-not $LlmMaxRecords)        { $LlmMaxRecords        = Get-EnvValue "LLM_MAX_RECORDS"          }
 if (-not $GithubMaxResults)     { $GithubMaxResults     = Get-EnvValue "OTM_GITHUB_MAX_RESULTS"  }
-if (-not $GithubMaxSearchRequests) { $GithubMaxSearchRequests = Get-EnvValue "OTM_GITHUB_MAX_SEARCH_REQUESTS" }
 if (-not $RssFeeds)             { $RssFeeds             = Get-EnvValue "OTM_RSS_FEEDS"            }
 if (-not $PacketStormApiSecret) { $PacketStormApiSecret = Get-EnvValue "PACKETSTORM_API_SECRET"   }
 if (-not $PacketStormUrls)      { $PacketStormUrls      = Get-EnvValue "PACKETSTORM_URLS"         }
@@ -220,7 +219,7 @@ if (-not $NonInteractive) {
   $LlmMaxRecords = Read-PlainValue "LLM_MAX_RECORDS (optional; leave empty = no limit)" $LlmMaxRecords
   $githubResultsDefault = if ($GithubMaxResults) { $GithubMaxResults } else { "100" }
   $GithubMaxResults = Read-PlainValue "OTM_GITHUB_MAX_RESULTS" $githubResultsDefault
-  $githubRequestDefault = if ($GithubMaxSearchRequests) { $GithubMaxSearchRequests } else { "1" }
+  $githubRequestDefault = "1"
   $GithubMaxSearchRequests = Read-PlainValue "OTM_GITHUB_MAX_SEARCH_REQUESTS" $githubRequestDefault
 
   Write-SetupStep "7. Additional data sources (optional)" "RSS and PacketStorm run automatically if configured."
